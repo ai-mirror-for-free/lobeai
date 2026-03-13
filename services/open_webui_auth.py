@@ -9,7 +9,7 @@ def get_jwt_token(email, password):
     :raises Exception: 如果登录失败
     """
     base_url = "http://localhost:8080"
-    login_url = f"{base_url.rstrip('/')}/api/v1/auth/login"
+    login_url = f"{base_url.rstrip('/')}/api/v1/auths/signup"
     payload = {
         "email": email,
         "password": password
