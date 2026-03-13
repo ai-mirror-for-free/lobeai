@@ -217,7 +217,14 @@ def main():
         # 删除后，需要重置 Session 中的 Authorization，因为 client 的 headers 已被 login 设置
         client.session.headers.pop("Authorization", None)
         client.api_key = None
-    except:
+    except requests.exceptions.HTTPError as e:
+        print(f"\n❌ HTTP 错误：{e}")
+        print("\n提示：请确保")
+        print("  1. OpenWebUI 服务正在运行")
+        print("  2. 请求参数符合要求")
+        print(f"\n❌ 连接错误：无法连接到 {BASE_URL}")
+        print("请确保 OpenWebUI 服务正在运行")
+    except Exception as e:
         print("无旧测试用户，继续...")
 
         # 示例 1: 用户注册
@@ -274,11 +281,8 @@ def main():
         print("\n提示：请确保")
         print("  1. OpenWebUI 服务正在运行")
         print("  2. 请求参数符合要求")
-    except requests.exceptions.ConnectionError as e:
         print(f"\n❌ 连接错误：无法连接到 {BASE_URL}")
         print("请确保 OpenWebUI 服务正在运行")
-    except Exception as e:
-        print(f"\n❌ 发生错误：{e}")
 
 
 if __name__ == "__main__":
