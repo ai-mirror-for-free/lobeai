@@ -139,30 +139,21 @@ class OpenWebUIClient:
                 f"获取用户信息失败 [{response.status_code}]: {error_msg}"
             )
 
-    def signin(self, email: str, password: str) -> dict:
+    def login_and_set_token(self, email: str, password: str) -> str:
         """
-        用户登录
-
-        Args:
-            email: 用户邮箱
-            password: 用户密码
+        登录并自动设置 Session 的 Authorization 头
 
         Returns:
-            登录成功返回 token 和用户信息
+            获取到的 token
         """
-        url = f"{self.base_url}/api/v1/auths/signin"
-
-        payload = {"email": email.lower(), "password": password}
-
-        response = self.session.post(url, json=payload)
-
-        if response.status_code == 200:
-            return response.json()
+        result = self.signin(email, password)
+        token = result.get("token")
+        if token:
+            self.session.headers.update({"Authorization": f"Bearer {token}"})
+            self.api_key = token
+            return token
         else:
-            error_msg = response.json().get("detail", response.text)
-            raise requests.exceptions.HTTPError(
-                f"登录失败 [{response.status_code}]: {error_msg}"
-            )
+            raise Exception("登录返回结果中未找到 token")
 
 
 def main():
