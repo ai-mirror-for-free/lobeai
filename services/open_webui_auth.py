@@ -9,7 +9,6 @@ def get_jwt_token(email, password):
     :param email: 用户邮箱
     :param password: 用户密码
     :return: JWT token 字符串
-    :raises Exception: 如果登录失败
     """
     load_dotenv()
     base_url = os.getenv("BASE_URL")
