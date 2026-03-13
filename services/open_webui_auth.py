@@ -27,8 +27,12 @@ def get_jwt_token(email, password):
 
         return token
 
+    except requests.exceptions.HTTPError as e:
+        # 获取服务器返回的详细错误信息
+        error_msg = e.response.text
+        raise Exception(f"请求失败 (状态码 {e.response.status_code}): {error_msg}")
     except requests.exceptions.RequestException as e:
-        raise Exception(f"登录请求失败: {e}")
+        raise Exception(f"网络请求发生错误: {e}")
 
 if __name__ == "__main__":
     import os
