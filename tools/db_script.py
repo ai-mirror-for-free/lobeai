@@ -70,6 +70,12 @@ class DatabaseManager:
             self.logger.error(f"命令执行失败: {e}")
             self.conn.rollback()
             return False
+        
+    def get_all_users(self):
+        """获取所有用户"""
+        command = 'select id,name,email,role,settings from "user"'
+        return self.execute_query(command)
+    
 
 if __name__ == "__main__":
     command = 'SELECT * FROM "user"'

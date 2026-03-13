@@ -1,4 +1,7 @@
+import os
 import requests
+from dotenv import load_dotenv
+
 
 def get_jwt_token(email, password):
     """
@@ -8,7 +11,8 @@ def get_jwt_token(email, password):
     :return: JWT token 字符串
     :raises Exception: 如果登录失败
     """
-    base_url = "http://localhost:8080"
+    load_dotenv()
+    base_url = os.getenv("BASE_URL")
     login_url = f"{base_url.rstrip('/')}/api/v1/auths/signin"
     payload = {
         "email": email,
@@ -33,6 +37,8 @@ def get_jwt_token(email, password):
         raise Exception(f"请求失败 (状态码 {e.response.status_code}): {error_msg}")
     except requests.exceptions.RequestException as e:
         raise Exception(f"网络请求发生错误: {e}")
+
+    
 
 if __name__ == "__main__":
     import os
