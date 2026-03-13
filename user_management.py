@@ -6,7 +6,6 @@ OpenWebUI 用户管理脚本
     python user_management.py --base-url http://localhost:8080 --api-key your_api_key
 """
 
-import argparse
 import requests
 from typing import Optional
 
@@ -62,7 +61,11 @@ class OpenWebUIClient:
         if profile_image_url:
             payload["profile_image_url"] = profile_image_url
 
-        response = self.session.post(url, json=payload)
+        # 创建一个不含 Authorization 的 header 副本
+        headers = {k: v for k, v in self.session.headers.items() if k != "Authorization"}
+
+        # 使用该 headers 发送 POST 请求
+        response = self.session.post(url, json=payload, headers=headers)
 
         if response.status_code == 200:
             return response.json()
@@ -227,16 +230,6 @@ def main():
             print(f"  邮箱：{user_info.get('email')}")
             print(f"  名称：{user_info.get('name')}")
             print(f"  角色：{user_info.get('role')}")
-        
-        # 示例 5: 删除用户 (需要管理员权限)
-        # 注意：以下代码默认注释掉，避免误删
-        # print("\n[示例 5] 删除用户")
-        # print("-" * 40)
-        # user_to_delete = users[-1].get('id')  # 删除最后一个用户作为示例
-        # print(f"删除用户 ID: {user_to_delete}")
-        # delete_result = client.delete_user(user_to_delete)
-        # if delete_result:
-        #     print(f"✓ 删除成功!")
         
         print("\n" + "=" * 60)
         print("所有示例执行完成!")
