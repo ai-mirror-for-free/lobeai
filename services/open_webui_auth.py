@@ -1,0 +1,40 @@
+import requests
+
+def get_jwt_token(email, password):
+    """
+    通过 Open WebUI 的登录接口获取 JWT token。
+    :param email: 用户邮箱
+    :param password: 用户密码
+    :return: JWT token 字符串
+    :raises Exception: 如果登录失败
+    """
+    base_url = "http://localhost:3000"
+    login_url = f"{base_url.rstrip('/')}/api/v1/auth/login"
+    payload = {
+        "email": email,
+        "password": password
+    }
+
+    try:
+        response = requests.post(login_url, json=payload)
+        response.raise_for_status()  # 检查 HTTP 错误
+
+        data = response.json()
+        token = data.get("token")
+
+        if not token:
+            raise Exception("返回数据中未找到 token")
+
+        return token
+
+    except requests.exceptions.RequestException as e:
+        raise Exception(f"登录请求失败: {e}")
+
+if __name__ == "__main__":
+    import os
+    from dotenv import load_dotenv
+    load_dotenv()
+    email = os.environ.get("ADMIN_USERNAME")
+    password = os.environ.get("ADMIN_PASSWORD")
+    token = get_jwt_token(email, password)
+    print(token)
