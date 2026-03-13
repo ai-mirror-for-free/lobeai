@@ -38,7 +38,7 @@ if __name__ == "__main__":
     import os
     from dotenv import load_dotenv
     load_dotenv()
-    email = os.environ.get("ADMIN_USERNAME")
+    email = os.environ.get("ADMIN_EMAIL")
     password = os.environ.get("ADMIN_PASSWORD")
     token = get_jwt_token(email, password)
     print(token)
