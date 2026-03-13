@@ -169,13 +169,13 @@ def main():
     BASE_URL = "http://localhost:8080"
     API_KEY = "your_api_key_here"  # 替换为您的 API Key
     
-    # 创建客户端实例
-    client = OpenWebUIClient(base_url=BASE_URL, api_key=API_KEY)
-    
+    # 创建客户端实例，初始不带 API Key
+    client = OpenWebUIClient(base_url=BASE_URL)
+
     print("=" * 60)
     print("OpenWebUI 用户管理示例")
     print("=" * 60)
-    
+
     try:
         # 示例 1: 用户注册
         print("\n[示例 1] 用户注册")
@@ -183,7 +183,7 @@ def main():
         new_user_email = "newuser@example.com"
         new_user_password = "secure_password123"
         new_user_name = "新用户"
-        
+
         print(f"注册用户：{new_user_email}")
         register_result = client.register_user(
             email=new_user_email,
@@ -192,22 +192,13 @@ def main():
         )
         print(f"✓ 注册成功!")
         print(f"  用户 ID: {register_result.get('id')}")
-        print(f"  Token: {register_result.get('token')}")
-        print(f"  角色：{register_result.get('role')}")
-        
-        # 示例 2: 用户登录
-        print("\n[示例 2] 用户登录")
+
+        # 登录并获取 token
+        print(f"\n[示例 2] 用户登录")
         print("-" * 40)
-        print(f"登录用户：{new_user_email}")
-        login_result = client.signin(
-            email=new_user_email,
-            password=new_user_password,
-        )
-        print(f"✓ 登录成功!")
-        print(f"  用户 ID: {login_result.get('id')}")
-        print(f"  Token: {login_result.get('token')}")
-        print(f"  角色：{login_result.get('role')}")
-        
+        client.login_and_set_token(new_user_email, new_user_password)
+        print(f"✓ 登录成功并已设置 Token!")
+
         # 示例 3: 获取用户列表
         print("\n[示例 3] 获取用户列表")
         print("-" * 40)
@@ -218,7 +209,7 @@ def main():
             print(f"      邮箱：{user.get('email')}")
             print(f"      名称：{user.get('name')}")
             print(f"      角色：{user.get('role')}")
-        
+
         # 示例 4: 根据 ID 获取用户信息
         if users:
             print("\n[示例 4] 获取指定用户信息")
@@ -230,17 +221,16 @@ def main():
             print(f"  邮箱：{user_info.get('email')}")
             print(f"  名称：{user_info.get('name')}")
             print(f"  角色：{user_info.get('role')}")
-        
+
         print("\n" + "=" * 60)
         print("所有示例执行完成!")
         print("=" * 60)
-        
+
     except requests.exceptions.HTTPError as e:
         print(f"\n❌ HTTP 错误：{e}")
         print("\n提示：请确保")
         print("  1. OpenWebUI 服务正在运行")
-        print("  2. API Key 正确且具有相应权限")
-        print("  3. 请求参数符合要求")
+        print("  2. 请求参数符合要求")
     except requests.exceptions.ConnectionError as e:
         print(f"\n❌ 连接错误：无法连接到 {BASE_URL}")
         print("请确保 OpenWebUI 服务正在运行")
