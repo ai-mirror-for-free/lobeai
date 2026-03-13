@@ -166,94 +166,102 @@ class OpenWebUIClient:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="OpenWebUI 用户管理工具")
-    parser.add_argument(
-        "--base-url",
-        type=str,
-        default="http://localhost:8080",
-        help="OpenWebUI 服务地址 (默认：http://localhost:8080)",
-    )
-    parser.add_argument(
-        "--api-key",
-        type=str,
-        help="API Key 或 JWT Token (删除用户时需要管理员权限)",
-    )
-
-    subparsers = parser.add_subparsers(dest="command", help="可用命令")
-
-    # 注册命令
-    register_parser = subparsers.add_parser("register", help="注册新用户")
-    register_parser.add_argument("--email", type=str, required=True, help="用户邮箱")
-    register_parser.add_argument("--password", type=str, required=True, help="用户密码")
-    register_parser.add_argument("--name", type=str, required=True, help="用户名称")
-    register_parser.add_argument("--avatar", type=str, help="头像 URL (可选)")
-
-    # 删除命令
-    delete_parser = subparsers.add_parser("delete", help="删除用户")
-    delete_parser.add_argument("--user-id", type=str, required=True, help="用户 ID")
-
-    # 列表命令
-    list_parser = subparsers.add_parser("list", help="列出所有用户")
-
-    # 登录命令
-    login_parser = subparsers.add_parser("login", help="用户登录")
-    login_parser.add_argument("--email", type=str, required=True, help="用户邮箱")
-    login_parser.add_argument("--password", type=str, required=True, help="用户密码")
-
-    args = parser.parse_args()
-
-    if not args.command:
-        parser.print_help()
-        return
-
-    client = OpenWebUIClient(base_url=args.base_url, api_key=args.api_key)
-
+    """
+    示例用法演示
+    
+    展示如何使用 OpenWebUIClient 进行用户管理操作
+    """
+    # 配置参数
+    BASE_URL = "http://localhost:8080"
+    API_KEY = "your_api_key_here"  # 替换为您的 API Key
+    
+    # 创建客户端实例
+    client = OpenWebUIClient(base_url=BASE_URL, api_key=API_KEY)
+    
+    print("=" * 60)
+    print("OpenWebUI 用户管理示例")
+    print("=" * 60)
+    
     try:
-        if args.command == "register":
-            print(f"正在注册用户：{args.email}")
-            result = client.register_user(
-                email=args.email,
-                password=args.password,
-                name=args.name,
-                profile_image_url=args.avatar,
-            )
-            print("注册成功!")
-            print(f"用户 ID: {result.get('id')}")
-            print(f"Token: {result.get('token')}")
-            print(f"角色：{result.get('role')}")
-
-        elif args.command == "delete":
-            print(f"正在删除用户：{args.user_id}")
-            result = client.delete_user(args.user_id)
-            if result:
-                print("用户删除成功!")
-
-        elif args.command == "list":
-            print("获取用户列表...")
-            users = client.get_users()
-            print(f"共找到 {len(users)} 个用户:\n")
-            for user in users:
-                print(f"  ID: {user.get('id')}")
-                print(f"  邮箱：{user.get('email')}")
-                print(f"  名称：{user.get('name')}")
-                print(f"  角色：{user.get('role')}")
-                print("-" * 40)
-
-        elif args.command == "login":
-            print(f"正在登录：{args.email}")
-            result = client.signin(email=args.email, password=args.password)
-            print("登录成功!")
-            print(f"用户 ID: {result.get('id')}")
-            print(f"Token: {result.get('token')}")
-            print(f"角色：{result.get('role')}")
-
+        # 示例 1: 用户注册
+        print("\n[示例 1] 用户注册")
+        print("-" * 40)
+        new_user_email = "newuser@example.com"
+        new_user_password = "secure_password123"
+        new_user_name = "新用户"
+        
+        print(f"注册用户：{new_user_email}")
+        register_result = client.register_user(
+            email=new_user_email,
+            password=new_user_password,
+            name=new_user_name,
+        )
+        print(f"✓ 注册成功!")
+        print(f"  用户 ID: {register_result.get('id')}")
+        print(f"  Token: {register_result.get('token')}")
+        print(f"  角色：{register_result.get('role')}")
+        
+        # 示例 2: 用户登录
+        print("\n[示例 2] 用户登录")
+        print("-" * 40)
+        print(f"登录用户：{new_user_email}")
+        login_result = client.signin(
+            email=new_user_email,
+            password=new_user_password,
+        )
+        print(f"✓ 登录成功!")
+        print(f"  用户 ID: {login_result.get('id')}")
+        print(f"  Token: {login_result.get('token')}")
+        print(f"  角色：{login_result.get('role')}")
+        
+        # 示例 3: 获取用户列表
+        print("\n[示例 3] 获取用户列表")
+        print("-" * 40)
+        users = client.get_users()
+        print(f"共找到 {len(users)} 个用户:")
+        for idx, user in enumerate(users, 1):
+            print(f"\n  [{idx}] ID: {user.get('id')}")
+            print(f"      邮箱：{user.get('email')}")
+            print(f"      名称：{user.get('name')}")
+            print(f"      角色：{user.get('role')}")
+        
+        # 示例 4: 根据 ID 获取用户信息
+        if users:
+            print("\n[示例 4] 获取指定用户信息")
+            print("-" * 40)
+            user_id = users[0].get('id')
+            print(f"查询用户 ID: {user_id}")
+            user_info = client.get_user_by_id(user_id)
+            print(f"✓ 获取成功!")
+            print(f"  邮箱：{user_info.get('email')}")
+            print(f"  名称：{user_info.get('name')}")
+            print(f"  角色：{user_info.get('role')}")
+        
+        # 示例 5: 删除用户 (需要管理员权限)
+        # 注意：以下代码默认注释掉，避免误删
+        # print("\n[示例 5] 删除用户")
+        # print("-" * 40)
+        # user_to_delete = users[-1].get('id')  # 删除最后一个用户作为示例
+        # print(f"删除用户 ID: {user_to_delete}")
+        # delete_result = client.delete_user(user_to_delete)
+        # if delete_result:
+        #     print(f"✓ 删除成功!")
+        
+        print("\n" + "=" * 60)
+        print("所有示例执行完成!")
+        print("=" * 60)
+        
     except requests.exceptions.HTTPError as e:
-        print(f"错误：{e}")
+        print(f"\n❌ HTTP 错误：{e}")
+        print("\n提示：请确保")
+        print("  1. OpenWebUI 服务正在运行")
+        print("  2. API Key 正确且具有相应权限")
+        print("  3. 请求参数符合要求")
     except requests.exceptions.ConnectionError as e:
-        print(f"连接错误：无法连接到 {args.base_url}")
-        print(f"请确保 OpenWebUI 服务正在运行")
+        print(f"\n❌ 连接错误：无法连接到 {BASE_URL}")
+        print("请确保 OpenWebUI 服务正在运行")
     except Exception as e:
-        print(f"发生错误：{e}")
+        print(f"\n❌ 发生错误：{e}")
 
 
 if __name__ == "__main__":
