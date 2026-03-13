@@ -203,7 +203,23 @@ def main():
     print("OpenWebUI 用户管理示例")
     print("=" * 60)
 
+    # 示例 1: 确保用户不存在，先尝试登录并删除 (或手动在界面处理)
+    # 此处逻辑是为了清理重复用户以便脚本测试通过
     try:
+        print("\n[清理] 检查并清理旧测试用户...")
+        client.login_and_set_token("newuser@example.com", "secure_password123")
+        users = client.get_users()
+        for user in users:
+            if user.get('email') == "newuser@example.com":
+                print(f"删除旧用户: {user.get('id')}")
+                client.delete_user(user.get('id'))
+
+        # 删除后，需要重置 Session 中的 Authorization，因为 client 的 headers 已被 login 设置
+        client.session.headers.pop("Authorization", None)
+        client.api_key = None
+    except:
+        print("无旧测试用户，继续...")
+
         # 示例 1: 用户注册
         print("\n[示例 1] 用户注册")
         print("-" * 40)
