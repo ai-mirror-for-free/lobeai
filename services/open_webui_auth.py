@@ -8,7 +8,7 @@ def get_jwt_token(email, password):
     :return: JWT token 字符串
     :raises Exception: 如果登录失败
     """
-    base_url = "http://localhost:3000"
+    base_url = "http://localhost:8080"
     login_url = f"{base_url.rstrip('/')}/api/v1/auth/login"
     payload = {
         "email": email,
