@@ -61,9 +61,8 @@ def get_jwt_token_with_user_info(email, password):
         print(data)
         token = data.get("token")
 
-        # 从返回数据中获取用户 ID
-        user_info = data.get("user", {})
-        user_id = user_info.get("id")
+        # 从返回数据中获取用户 ID (Open WebUI 返回的 id 在根级别)
+        user_id = data.get("id")
 
         if not token:
             raise Exception("返回数据中未找到 token")
