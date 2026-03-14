@@ -31,6 +31,7 @@ class NewAPIClient:
         self.base_url = os.getenv("NEWAPI_URL")
         self.session = requests.Session()
         self.session.headers.update({"Content-Type": "application/json"})
+        self.user_id = None
 
     # ──────────────────────────────────────────────
     # 认证
@@ -60,7 +61,11 @@ class NewAPIClient:
         if not data.get("success"):
             raise RuntimeError(f"登录失败: {data.get('message', '未知错误')}")
 
-        return data.get("data", {})
+        user_data = data.get("data", {})
+        self.user_id = user_data.get("id")
+        if self.user_id:
+            self.session.headers.update({"New-Api-User": str(self.user_id)})
+        return user_data
 
     def logout(self) -> None:
         """登出并清除 Session"""
@@ -102,7 +107,11 @@ class NewAPIClient:
         if not data.get("success"):
             raise RuntimeError(f"创建令牌失败: {data.get('message', '未知错误')}")
 
-        return data.get("data", {})
+        # API 不直接返回创建的令牌数据，需要查询列表获取
+        tokens = self.list_tokens(page=0, page_size=1)
+        if tokens:
+            return tokens[0]
+        raise RuntimeError("创建令牌失败：无法获取新创建的令牌")
 
     def list_tokens(self, page: int = 0, page_size: int = 10) -> list[dict]:
         """
@@ -125,7 +134,7 @@ class NewAPIClient:
         if not data.get("success"):
             raise RuntimeError(f"查询令牌失败: {data.get('message', '未知错误')}")
 
-        return data.get("data", [])
+        return data.get("data", {}).get("items", [])
 
     def get_token(self, token_id: int) -> dict:
         """
