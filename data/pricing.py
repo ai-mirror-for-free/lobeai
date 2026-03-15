@@ -30,7 +30,11 @@ def get_model_pricing(model_id: str):
                 pricing = {
                     k: float(v) * 1e6 for k, v in pricing.items() if v is not None
                 }
-                pricing["web_search"] = pricing.get("web_search", 0) / 1000
+                pricing["web_search"] = (
+                    pricing.get("web_search", 0) / 1000
+                    if pricing.get("web_search", 0)
+                    else None
+                )
                 return pricing
         return None
 
@@ -42,36 +46,46 @@ def get_model_pricing(model_id: str):
 if __name__ == "__main__":
     # Example usage:
     model_list = [
+        "anthropic/claude-3.5-haiku",
+        "anthropic/claude-3.5-sonnet",
+        "anthropic/claude-3.7-sonnet",
         "anthropic/claude-3.7-sonnet:thinking",
         "anthropic/claude-3-haiku",
-        "anthropic/claude-opus-4.1",
+        "anthropic/claude-haiku-4.5",
         "anthropic/claude-opus-4",
-        "anthropic/claude-3.7-sonnet",
-        "anthropic/claude-3.5-sonnet",
-        "anthropic/claude-sonnet-4.6",
+        "anthropic/claude-opus-4.1",
         "anthropic/claude-opus-4.5",
-        "anthropic/claude-3.5-haiku",
         "anthropic/claude-opus-4.6",
-        "google/gemma-3n-e2b-it:free",
-        "google/gemma-3-4b-it",
-        "google/gemini-3-pro-preview",
-        "google/gemini-2.5-pro-preview",
-        "google/gemma-3-27b-it",
-        "google/gemini-3-flash-preview",
-        "google/gemma-3n-e4b-it",
+        "anthropic/claude-sonnet-4.6",
         "google/gemini-2.0-flash-001",
+        "google/gemini-2.0-flash-lite-001",
+        "google/gemini-2.5-flash",
         "google/gemini-2.5-flash-lite-preview-09-2025",
+        "google/gemini-2.5-pro-preview",
         "google/gemini-3.1-flash-image-preview",
-        "openai/gpt-5-mini",
-        "openai/o3",
+        "google/gemini-3.1-flash-lite-preview",
+        "google/gemini-3.1-pro-preview",
+        "google/gemini-3-flash-preview",
+        "google/gemini-3-pro-preview",
+        "google/gemma-3-27b-it",
+        "google/gemma-3-4b-it",
+        "google/gemma-3n-e2b-it:free",
+        "google/gemma-3n-e4b-it",
+        "openai/gpt-3.5-turbo-0613",
+        "openai/gpt-4.1",
+        "openai/gpt-4.1-mini",
         "openai/gpt-4o-mini",
+        "openai/gpt-4-turbo",
+        "openai/gpt-5.1-codex",
+        "openai/gpt-5.1",
+        "openai/gpt-5.4",
         "openai/gpt-5-image",
+        "openai/gpt-5-mini",
+        "openai/gpt-5-nano",
+        "openai/gpt-oss-120b",
+        "openai/o3",
         "openai/o3-mini",
         "openai/o3-mini-high",
-        "openai/gpt-4.1",
-        "openai/gpt-5.1-codex",
-        "openai/gpt-3.5-turbo-0613",
-        "openai/gpt-4-turbo",
     ]
     pricing_data = {}
     pricing_db = pd.DataFrame(
@@ -84,7 +98,7 @@ if __name__ == "__main__":
             "internal_reasoning",
             "input_cache_read",
             "input_cache_write",
-            "web_search"
+            "web_search",
         ]
     )
     for model in model_list:
@@ -99,14 +113,20 @@ if __name__ == "__main__":
                         [
                             {
                                 "model": model,
-                                "prompt": pricing.get("prompt", 0),
-                                "completion": pricing.get("completion", 0),
-                                "image": pricing.get("image", 0),
-                                "audio": pricing.get("audio", 0),
-                                "internal_reasoning": pricing.get("internal_reasoning", 0),
-                                "input_cache_read": pricing.get("input_cache_read", 0),
-                                "input_cache_write": pricing.get("input_cache_write", 0),
-                                "web_search": pricing.get("web_search", 0),
+                                "prompt": pricing.get("prompt", None),
+                                "completion": pricing.get("completion", None),
+                                "image": pricing.get("image", None),
+                                "audio": pricing.get("audio", None),
+                                "internal_reasoning": pricing.get(
+                                    "internal_reasoning", None
+                                ),
+                                "input_cache_read": pricing.get(
+                                    "input_cache_read", None
+                                ),
+                                "input_cache_write": pricing.get(
+                                    "input_cache_write", None
+                                ),
+                                "web_search": pricing.get("web_search", None),
                             }
                         ]
                     ),

@@ -1,3 +1,4 @@
+# open_webui 注册用户
 import requests
 import random
 import string
