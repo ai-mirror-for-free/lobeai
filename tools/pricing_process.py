@@ -108,7 +108,7 @@ def get_newest_pricing():
     return pricing_data
 
 
-def upfdate_model_pricing(ratio=1.5):
+def upfdate_model_pricing(ratio=1):
     newest_pricing = get_newest_pricing()
     db.connect()
     # 获取当前 价格
