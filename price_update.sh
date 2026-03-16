@@ -1,3 +1,5 @@
+#!/usr/bin/env bash
+
 cd /root/lobeai
 source /root/miniforge3/etc/profile.d/conda.sh
 conda activate ai
