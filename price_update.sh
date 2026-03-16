@@ -1,4 +1,5 @@
 cd /root/lobeai
+conda init
 source ~/.bashrc
 conda activate lobeai
 export PYTHONPATH="${PYTHONPATH}:$PWD"
