@@ -6,13 +6,13 @@ from tools.logger_manager import LoggerManager
 class DatabaseManager:
     """管理 PostgreSQL 数据库的操作类"""
 
-    def __init__(self, env_path=".env"):
+    def __init__(self, env_path=".env", db_name="oneapi"):
         load_dotenv(env_path)
         self.host = os.getenv("DB_HOST", "localhost")
         self.port = os.getenv("DB_PORT", "5432")
         self.user = os.getenv("DB_USERNAME")
         self.password = os.getenv("DB_PASSWORD")
-        self.dbname = os.getenv("DB_DATABASE")
+        self.dbname = db_name
         self.conn = None
         self.logger = LoggerManager()
 
@@ -71,10 +71,23 @@ class DatabaseManager:
             self.conn.rollback()
             return False
         
+
+class NewApiDatabaseManager(DatabaseManager):
+    """管理 new-api 数据库的操作类"""
+    def __init__(self, env_path=".env", db_name="oneapi"):
+        super().__init__(env_path, db_name)
+
+
+class OpenWebUIDatabaseManager(DatabaseManager):
+    """管理 open-webui 数据库的操作类"""
+    def __init__(self, env_path=".env", db_name="openwebui "):
+        super().__init__(env_path, db_name)
+    
     def get_all_users(self):
         """获取所有用户"""
         command = 'select id,name,email,role,settings from "user"'
         return self.execute_query(command)
+
     
 
 if __name__ == "__main__":
