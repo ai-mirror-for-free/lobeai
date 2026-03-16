@@ -1,6 +1,5 @@
 cd /root/lobeai
-source ~/.bashrc
-conda init
+source /root/miniforge3/etc/profile.d/conda.sh
 conda activate ai
 export PYTHONPATH="${PYTHONPATH}:$PWD"
 python tools/pricing_process.py
