@@ -1,6 +1,6 @@
 cd /root/lobeai
 conda init
 source ~/.bashrc
-conda activate lobeai
+conda activate ai
 export PYTHONPATH="${PYTHONPATH}:$PWD"
 python tools/pricing_process.py
