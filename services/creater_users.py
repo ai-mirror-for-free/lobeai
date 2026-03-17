@@ -106,7 +106,9 @@ def main_register_user(
         "insert into users_center (name, email, plan_level, plan_price, days_left, quota_left, recharge, token) values (%s, %s, %s, %s, %s, %s, %s, %s)",
         (username, email, "free", 0, 1, 50000, 50000, token_key),
     )
-
+    newapidata.disconnect()
+    logger.info(f"用户信息已更新: {username}")
+    return f"注册成功，用户名: {username}, 密码: {password}, 邮箱: {email}, 验证码: {verification_code}"
 
 
 
