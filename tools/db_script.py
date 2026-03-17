@@ -80,7 +80,7 @@ class NewApiDatabaseManager(DatabaseManager):
 
 class OpenWebUIDatabaseManager(DatabaseManager):
     """管理 open-webui 数据库的操作类"""
-    def __init__(self, env_path=".env", db_name="openwebui "):
+    def __init__(self, env_path=".env", db_name="openwebui"):
         super().__init__(env_path, db_name)
     
     def get_all_users(self):

@@ -19,11 +19,11 @@ def generate_random_string(length=8):
 def generate_random_user():
     name = f"user_{generate_random_string()}"
     email = f"{name}@gmail.com"
-    return name, email
-
-def register_random_user(name=None, email=None):
-
     password = secrets.token_urlsafe(16)
+    return name, email, password
+
+
+def register_user(name=None, email=None, password=None):
 
     logger.info(f"Attempting to register user: {name} ({email})")
 
@@ -36,7 +36,6 @@ def register_random_user(name=None, email=None):
             logger.info(f"Successfully registered user: {name}")
             logger.info(f"Email: {email}")
             logger.info(f"Password: {password}")
-            return payload
         else:
             logger.error(
                 f"Failed to register user. Status code: {response.status_code}"
@@ -47,7 +46,8 @@ def register_random_user(name=None, email=None):
         logger.error(f"An error occurred: {e}")
 
 
+
 if __name__ == "__main__":
     # Using a secure random password
-    name, email = generate_random_user()
-    register_random_user(name, email)
+    name, email,  password= generate_random_user()
+    register_user(name, email, password)

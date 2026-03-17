@@ -32,12 +32,13 @@ class NewAPIClient:
         self.session = requests.Session()
         self.session.headers.update({"Content-Type": "application/json"})
         self.user_id = None
+        self.db = None  # 数据库连接，用于获取完整的 token key
 
     # ──────────────────────────────────────────────
     # 认证
     # ──────────────────────────────────────────────
 
-    def login(self, username: str, password: str) -> dict:
+    def login(self) -> dict:
         """
         登录并保存 Session Cookie
 
@@ -51,6 +52,8 @@ class NewAPIClient:
         Raises:
             RuntimeError: 登录失败时抛出，包含错误信息
         """
+        username = os.environ.get("NEWAPI_USER")
+        password = os.environ.get("NEWAPI_PASSWORD")
         resp = self.session.post(
             f"{self.base_url}/api/user/login",
             json={"username": username, "password": password},
@@ -72,9 +75,113 @@ class NewAPIClient:
         self.session.get(f"{self.base_url}/api/user/logout")
         self.session.cookies.clear()
 
+    def send_verification_code(self, email: str) -> None:
+        """
+        发送邮箱验证码
+
+        Args:
+            email: 邮箱地址
+
+        Raises:
+            RuntimeError: 发送失败时抛出
+        """
+        resp = self.session.get(
+            f"{self.base_url}/api/verification",
+            params={"email": email},
+        )
+        resp.raise_for_status()
+        data = resp.json()
+
+        if not data.get("success"):
+            raise RuntimeError(f"发送验证码失败: {data.get('message', '未知错误')}")
+
+    def register(
+        self,
+        username: str,
+        password: str,
+        email: str,
+        verification_code: str,
+        aff_code: str = "",
+    ) -> dict:
+        """
+        用户注册（需要邮箱验证码）
+
+        Args:
+            username: 用户名
+            password: 密码
+            email: 邮箱地址
+            verification_code: 邮箱验证码
+            aff_code: 推荐码（可选）
+
+        Returns:
+            用户信息 dict
+
+        Raises:
+            RuntimeError: 注册失败时抛出
+        """
+        payload = {
+            "username": username,
+            "password": password,
+            "email": email,
+            "verification_code": verification_code,
+        }
+        if aff_code:
+            payload["aff_code"] = aff_code
+
+        resp = self.session.post(
+            f"{self.base_url}/api/user/register",
+            json=payload,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+
+        if not data.get("success"):
+            raise RuntimeError(f"注册失败: {data.get('message', '未知错误')}")
+
+        return data.get("data", {})
+
     # ──────────────────────────────────────────────
     # 令牌管理
     # ──────────────────────────────────────────────
+
+    def _get_full_token_key_from_db(self, token_id: int) -> dict:
+        """
+        从数据库获取完整的 token key（绕过 API 的屏蔽）
+
+        Args:
+            token_id: 令牌 ID
+
+        Returns:
+            包含完整 key 的 token dict，如果查询失败则返回 None
+        """
+        try:
+            from tools.db_script import NewApiDatabaseManager
+            db = NewApiDatabaseManager()
+            db.connect()
+            # 数据库表结构: id, user_id, key, status, name, created_time, accessed_time, expired_time, ...
+            result = db.execute_query(
+                "SELECT id, key, name, status, created_time, expired_time, remain_quota, unlimited_quota, model_limits_enabled FROM tokens WHERE id = %s",
+                (token_id,)
+            )
+            db.disconnect()
+
+            if result:
+                row = result[0]
+                return {
+                    "id": row[0],
+                    "key": row[1],  # 完整的 key
+                    "name": row[2],
+                    "status": row[3],
+                    "created_time": row[4],
+                    "expired_time": row[5],
+                    "remain_quota": row[6],
+                    "unlimited_quota": row[7],
+                    "model_limits_enabled": row[8],
+                }
+        except Exception as e:
+            import sys
+            print(f"警告: 无法从数据库获取完整 token key: {e}", file=sys.stderr)
+        return None
 
     def create_token(self, config: TokenConfig) -> dict:
         """
@@ -84,7 +191,7 @@ class NewAPIClient:
             config: TokenConfig 实例，描述令牌的配置
 
         Returns:
-            包含 key（sk-xxx）等信息的 dict
+            包含 key（sk-xxx）等信息的 dict（key 为完整值）
 
         Raises:
             RuntimeError: 创建失败时抛出
@@ -107,10 +214,22 @@ class NewAPIClient:
         if not data.get("success"):
             raise RuntimeError(f"创建令牌失败: {data.get('message', '未知错误')}")
 
-        # API 不直接返回创建的令牌数据，需要查询列表获取
+        # 获取最新创建的令牌
         tokens = self.list_tokens(page=0, page_size=1)
         if tokens:
-            return tokens[0]
+            token = tokens[0]
+            token_id = token.get("id")
+
+            # 从数据库获取完整的 key（绕过 API 的屏蔽）
+            full_token_data = self._get_full_token_key_from_db(token_id)
+            if full_token_data and full_token_data.get("key"):
+                # 使用完整 key 更新返回的 token 数据
+                token.update(full_token_data)
+                return token
+
+            # 如果从数据库获取失败，返回 API 返回的屏蔽 key
+            return token
+
         raise RuntimeError("创建令牌失败：无法获取新创建的令牌")
 
     def list_tokens(self, page: int = 0, page_size: int = 10) -> list[dict]:
@@ -199,34 +318,59 @@ class NewAPIClient:
 if __name__ == "__main__":
     # 1. 初始化客户端
     client = NewAPIClient()
-    username = os.environ.get("NEWAPI_USER")
-    password = os.environ.get("NEWAPI_PASSWORD")
+
+    # ──────────────────────────────────────────────
+    # 注册流程示例
+    # ──────────────────────────────────────────────
+    # 1. 发送邮箱验证码
+    email = "2277248178@qq.com"
+    print(f"正在发送验证码到 {email}...")
+    try:
+        client.send_verification_code(email)
+        print("验证码已发送，请检查邮箱")
+    except RuntimeError as e:
+        print(f"发送失败: {e}")
+
+    # 2. 用户输入验证码后，进行注册
+    verification_code = input("请输入收到的验证码: ")
+    user_info = client.register(
+        username="2277248178",
+        password="yf3816547290",
+        email=email,
+        verification_code=verification_code,
+        aff_code="optional_referral_code",
+    )
+    print(f"注册成功，用户: {user_info.get('username')}")
+
+    # ──────────────────────────────────────────────
+    # 登录流程示例
+    # ──────────────────────────────────────────────
     # 2. 登录
-    user_info = client.login(username, password)
-    print(f"登录成功，用户: {user_info.get('username')}")
+    # user_info = client.login()
+    # print(f"登录成功，用户: {user_info.get('username')}")
 
-    # 3. 创建令牌（无限额度，永不过期）
-    token = client.create_token(TokenConfig(
-        name="my-test-token",
-        remain_quota=-1,
-        expired_time=-1,
-    ))
-    print(f"令牌已创建: {token.get('key')}")
+    # # 3. 创建令牌（无限额度，永不过期）
+    # token = client.create_token(TokenConfig(
+    #     name="my-test-token",
+    #     remain_quota=-1,
+    #     expired_time=-1,
+    # ))
+    # print(f"令牌已创建: {token.get('key')}")
 
-    # 4. 创建带限制的令牌（只允许调用 gpt-4o，配额 100000）
-    limited_token = client.create_token(TokenConfig(
-        name="limited-token",
-        remain_quota=100_000,
-        unlimited_quota=False,
-        model_limits_enabled=True,
-        model_limits="gpt-4o,claude-3-5-sonnet-20241022",
-    ))
-    print(f"限制令牌已创建: {limited_token.get('key')}")
+    # # 4. 创建带限制的令牌（只允许调用 gpt-4o，配额 100000）
+    # limited_token = client.create_token(TokenConfig(
+    #     name="limited-token",
+    #     remain_quota=100_000,
+    #     unlimited_quota=False,
+    #     model_limits_enabled=True,
+    #     model_limits="gpt-4o,claude-3-5-sonnet-20241022",
+    # ))
+    # print(f"限制令牌已创建: {limited_token.get('key')}")
 
-    # 5. 查询令牌列表
-    tokens = client.list_tokens(page=0, page_size=20)
-    for t in tokens:
-        print(f"  [{t['id']}] {t['name']} - {'启用' if t['status'] == 1 else '禁用'}")
+    # # 5. 查询令牌列表
+    # tokens = client.list_tokens(page=0, page_size=20)
+    # for t in tokens:
+    #     print(f"  [{t['id']}] {t['name']} - {'启用' if t['status'] == 1 else '禁用'}")
 
     # 6. 禁用令牌
     # client.update_token_status(token["id"], enabled=False)

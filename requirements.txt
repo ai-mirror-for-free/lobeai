@@ -3,3 +3,6 @@ dotenv
 psycopg2-binary
 openpyxl
 pandas
+fastapi
+pydantic
+email-validator
