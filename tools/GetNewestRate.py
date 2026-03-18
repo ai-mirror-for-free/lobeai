@@ -16,8 +16,3 @@ def get_usd_cny_rate():
     except Exception as e:
         logger.error(f"获取汇率失败：{e}")
         return 6.9, False
-
-
-if __name__ == "__main__":
-    rate = get_usd_cny_rate()
-    print(f"当前 USD -> CNY 汇率: {rate}")

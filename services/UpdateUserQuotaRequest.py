@@ -45,18 +45,3 @@ def get_user_info(username, email):
     )
     db.disconnect()
     return user_key_info
-
-
-if __name__ == "__main__":
-    """
-    {
-        "remain_quota": 剩余额度,
-        "model_limits": 可用模型列表
-        "used_quota": 当前套餐已经使用的额度,
-        "expired_time": 过期时间时间戳,
-        "plan_level": 套餐版本,
-    }
-    """
-    res = get_user_info("2277248178", "2277248178@qq.com")
-    for key, value in res.items():
-        print(key, value)

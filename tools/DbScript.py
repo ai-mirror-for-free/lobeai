@@ -87,13 +87,3 @@ class OpenWebUIDatabaseManager(DatabaseManager):
         """获取所有用户"""
         command = 'select id,name,email,role,settings from "user"'
         return self.execute_query(command)
-
-    
-
-if __name__ == "__main__":
-    command = 'SELECT * FROM "user"'
-    db = DatabaseManager()
-    db.connect()
-    results = db.execute_query(command)
-    print(results)
-    db.disconnect()

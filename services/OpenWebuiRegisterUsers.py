@@ -60,10 +60,3 @@ def register_user(name=None, email=None, password=None, role="user"):
     except Exception as e:
         logger.error(f"An error occurred: {e}")
         return False
-
-
-
-if __name__ == "__main__":
-    # Using a secure random password
-    name, email,  password= generate_random_user()
-    register_user(name, email, password)

@@ -110,17 +110,3 @@ def main_register_user(
             "verification_code": verification_code,
         },
     }
-
-
-if __name__ == "__main__":
-    username = "2277248178"
-    password = "yf3816547290"
-    email = "2277248178@qq.com"
-    newapiclient.send_verification_code(email)
-    verification_code = input("请输入验证码: ")
-    main_register_user(
-        username=username,
-        password=password,
-        email=email,
-        verification_code=verification_code,
-    )

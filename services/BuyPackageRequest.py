@@ -139,7 +139,3 @@ def buy_package(
             "quota_left": remain_quota,
         },
     }
-
-
-if __name__ == "__main__":
-    print(buy_package("2277248178", "2277248178@qq.com", "yf3816547290", "pro", 2))
