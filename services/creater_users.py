@@ -57,7 +57,9 @@ def main_register_user(
     logger.info(f"限制令牌已创建: {token_key}")
 
     if not token_key or token_key == "***":
-        logger.error(f"警告: 无法获取有效的 token key，token_id: {trail_token.get('id')}")
+        logger.error(
+            f"警告: 无法获取有效的 token key，token_id: {trail_token.get('id')}"
+        )
         raise RuntimeError("无法获取有效的 token key")
 
     # 生成装配文件
@@ -88,19 +90,6 @@ def main_register_user(
     openwebuidata.disconnect()
 
     # 更新用户中心信息
-    """
-    CREATE TABLE users_center (
-    id          SERIAL PRIMARY KEY,
-    name        VARCHAR(100)       NOT NULL,
-    email       VARCHAR(255)       UNIQUE NOT NULL,
-    plan_level  VARCHAR(50),
-    plan_price  NUMERIC(10, 2)     DEFAULT 0,
-    days_left   INT                DEFAULT 0,
-    quota_left  NUMERIC(15, 2)     DEFAULT 0,
-    recharge    NUMERIC(15, 2)     DEFAULT 0,
-    token       VARCHAR(512)       UNIQUE
-);
-    """
     newapidata.connect()
     newapidata.execute_command(
         "insert into users_center (name, email, plan_level, plan_price, days_left, quota_left, recharge, token) values (%s, %s, %s, %s, %s, %s, %s, %s)",
@@ -111,12 +100,10 @@ def main_register_user(
     return f"注册成功，用户名: {username}, 密码: {password}, 邮箱: {email}, 验证码: {verification_code}"
 
 
-
-
 if __name__ == "__main__":
-    username="2277248178"
-    password="yf3816547290"
-    email="2277248178@qq.com"
+    username = "2277248178"
+    password = "yf3816547290"
+    email = "2277248178@qq.com"
     newapiclient.send_verification_code(email)
     verification_code = input("请输入验证码: ")
     main_register_user(

@@ -29,7 +29,7 @@ Access detailed API documentation for different services provided by Open WebUI:
 - **Example**:
     
     ```bash
-    curl -H "Authorization: Bearer YOUR_API_KEY" http://localhost:3000/api/models
+    curl -H "Authorization: Bearer YOUR_API_KEY" http://localhost:25142/api/models
     ```
     
 
@@ -42,7 +42,7 @@ Access detailed API documentation for different services provided by Open WebUI:
 - **Curl Example**:
     
     ```bash
-    curl -X POST http://localhost:3000/api/chat/completions \
+    curl -X POST http://localhost:25142/api/chat/completions \
     -H "Authorization: Bearer YOUR_API_KEY" \
     -H "Content-Type: application/json" \
     -d '{
@@ -62,7 +62,7 @@ Access detailed API documentation for different services provided by Open WebUI:
     import requests
     
     def chat_with_model(token):
-        url = 'http://localhost:3000/api/chat/completions'
+        url = 'http://localhost:25142/api/chat/completions'
         headers = {
             'Authorization': f'Bearer {token}',
             'Content-Type': 'application/json'
@@ -94,7 +94,7 @@ Internally, the endpoint converts the Anthropic request format to OpenAI Chat Co
 - **Curl Example** (non-streaming):
     
     ```bash
-    curl -X POST http://localhost:3000/api/v1/messages \
+    curl -X POST http://localhost:25142/api/v1/messages \
     -H "x-api-key: YOUR_API_KEY" \
     -H "Content-Type: application/json" \
     -d '{
@@ -112,7 +112,7 @@ Internally, the endpoint converts the Anthropic request format to OpenAI Chat Co
 - **Curl Example** (streaming):
     
     ```bash
-    curl -X POST http://localhost:3000/api/v1/messages \
+    curl -X POST http://localhost:25142/api/v1/messages \
     -H "x-api-key: YOUR_API_KEY" \
     -H "Content-Type: application/json" \
     -d '{
@@ -135,7 +135,7 @@ Internally, the endpoint converts the Anthropic request format to OpenAI Chat Co
     
     client = Anthropic(
         api_key="YOUR_OPEN_WEBUI_API_KEY",
-        base_url="http://localhost:3000/api",
+        base_url="http://localhost:25142/api",
     )
     
     message = client.messages.create(
@@ -150,7 +150,7 @@ Internally, the endpoint converts the Anthropic request format to OpenAI Chat Co
     
     warning
     
-    The `base_url` must be `http://localhost:3000/api` (not `/api/v1`). The Anthropic SDK automatically appends `/v1/messages` to the base URL.
+    The `base_url` must be `http://localhost:25142/api` (not `/api/v1`). The Anthropic SDK automatically appends `/v1/messages` to the base URL.
     
 - **Claude Code Configuration**:
     
@@ -158,7 +158,7 @@ Internally, the endpoint converts the Anthropic request format to OpenAI Chat Co
     
     ```bash
     # Set environment variables for Claude Code
-    export ANTHROPIC_BASE_URL="http://localhost:3000/api"
+    export ANTHROPIC_BASE_URL="http://localhost:25142/api"
     export ANTHROPIC_API_KEY="YOUR_OPEN_WEBUI_API_KEY"
     
     # Then run Claude Code as normal
@@ -170,7 +170,7 @@ Internally, the endpoint converts the Anthropic request format to OpenAI Chat Co
     ```json
     {
       "env": {
-        "ANTHROPIC_BASE_URL": "http://localhost:3000/api",
+        "ANTHROPIC_BASE_URL": "http://localhost:25142/api",
         "ANTHROPIC_AUTH_TOKEN": "YOUR_OPEN_WEBUI_API_KEY"
       }
     }
@@ -218,7 +218,7 @@ The `outlet()` function only runs when the WebUI calls `/api/chat/completed` aft
 - **Curl Example**:
     
     ```bash
-    curl -X POST http://localhost:3000/api/chat/completed \
+    curl -X POST http://localhost:25142/api/chat/completed \
     -H "Authorization: Bearer YOUR_API_KEY" \
     -H "Content-Type: application/json" \
     -d '{
@@ -242,7 +242,7 @@ The `outlet()` function only runs when the WebUI calls `/api/chat/completed` aft
         Call after receiving the full response from /api/chat/completions
         to trigger outlet filter processing.
         """
-        url = 'http://localhost:3000/api/chat/completed'
+        url = 'http://localhost:25142/api/chat/completed'
         headers = {
             'Authorization': f'Bearer {token}',
             'Content-Type': 'application/json'
@@ -273,7 +273,7 @@ If you want to interact directly with Ollama models—including for embedding ge
 #### 🔁 Generate Completion (Streaming)[​](#-generate-completion-streaming "Direct link to 🔁 Generate Completion &#40;Streaming&#41;")
 
 ```bash
-curl http://localhost:3000/ollama/api/generate \
+curl http://localhost:25142/ollama/api/generate \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -285,14 +285,14 @@ curl http://localhost:3000/ollama/api/generate \
 #### 📦 List Available Models[​](#-list-available-models "Direct link to 📦 List Available Models")
 
 ```bash
-curl http://localhost:3000/ollama/api/tags \
+curl http://localhost:25142/ollama/api/tags \
   -H "Authorization: Bearer YOUR_API_KEY"
 ```
 
 #### 🧠 Generate Embeddings[​](#-generate-embeddings "Direct link to 🧠 Generate Embeddings")
 
 ```bash
-curl -X POST http://localhost:3000/ollama/api/embed \
+curl -X POST http://localhost:25142/ollama/api/embed \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
@@ -325,7 +325,7 @@ To utilize external data in RAG responses, you first need to upload the files. T
     
     ```bash
     curl -X POST -H "Authorization: Bearer YOUR_API_KEY" -H "Accept: application/json" \
-    -F "file=@/path/to/your/file" http://localhost:3000/api/v1/files/
+    -F "file=@/path/to/your/file" http://localhost:25142/api/v1/files/
     ```
     
 - **Python Example**:
@@ -334,7 +334,7 @@ To utilize external data in RAG responses, you first need to upload the files. T
     import requests
     
     def upload_file(token, file_path):
-        url = 'http://localhost:3000/api/v1/files/'
+        url = 'http://localhost:25142/api/v1/files/'
         headers = {
             'Authorization': f'Bearer {token}',
             'Accept': 'application/json'
@@ -389,7 +389,7 @@ Before adding a file to a knowledge base, verify that processing has completed u
         Raises:
             TimeoutError: If processing doesn't complete within timeout
         """
-        url = f'http://localhost:3000/api/v1/files/{file_id}/process/status'
+        url = f'http://localhost:25142/api/v1/files/{file_id}/process/status'
         headers = {'Authorization': f'Bearer {token}'}
         
         start_time = time.time()
@@ -419,7 +419,7 @@ Before adding a file to a knowledge base, verify that processing has completed u
         Wait for file processing using Server-Sent Events stream.
         More efficient than polling for long-running operations.
         """
-        url = f'http://localhost:3000/api/v1/files/{file_id}/process/status?stream=true'
+        url = f'http://localhost:25142/api/v1/files/{file_id}/process/status?stream=true'
         headers = {'Authorization': f'Bearer {token}'}
         
         with requests.get(url, headers=headers, stream=True) as response:
@@ -452,7 +452,7 @@ important
 - **Curl Example**:
     
     ```bash
-    curl -X POST http://localhost:3000/api/v1/knowledge/{knowledge_id}/file/add \
+    curl -X POST http://localhost:25142/api/v1/knowledge/{knowledge_id}/file/add \
     -H "Authorization: Bearer YOUR_API_KEY" \
     -H "Content-Type: application/json" \
     -d '{"file_id": "your-file-id-here"}'
@@ -464,7 +464,7 @@ important
     import requests
     
     def add_file_to_knowledge(token, knowledge_id, file_id):
-        url = f'http://localhost:3000/api/v1/knowledge/{knowledge_id}/file/add'
+        url = f'http://localhost:25142/api/v1/knowledge/{knowledge_id}/file/add'
         headers = {
             'Authorization': f'Bearer {token}',
             'Content-Type': 'application/json'
@@ -497,7 +497,7 @@ Use this endpoint to fetch a webpage, extract content, and store the resulting c
 - **Curl Example** (preserve existing vectors):
     
     ```bash
-    curl -X POST 'http://localhost:3000/api/v1/retrieval/process/web?process=true&overwrite=false' \
+    curl -X POST 'http://localhost:25142/api/v1/retrieval/process/web?process=true&overwrite=false' \
     -H 'Authorization: Bearer YOUR_API_KEY' \
     -H 'Content-Type: application/json' \
     -d '{
@@ -513,7 +513,7 @@ Use this endpoint to fetch a webpage, extract content, and store the resulting c
     
     def process_web_url(token, url, collection_name="testkb", overwrite=False):
         response = requests.post(
-            'http://localhost:3000/api/v1/retrieval/process/web',
+            'http://localhost:25142/api/v1/retrieval/process/web',
             headers={
                 'Authorization': f'Bearer {token}',
                 'Content-Type': 'application/json'
@@ -543,7 +543,7 @@ Here's a complete example that uploads a file, waits for processing, and adds it
 import requests
 import time
 
-WEBUI_URL = 'http://localhost:3000'
+WEBUI_URL = 'http://localhost:25142'
 TOKEN = 'your-api-key-here'
 
 def upload_and_add_to_knowledge(file_path, knowledge_id, timeout=300):
@@ -623,7 +623,7 @@ This method is beneficial when you want to focus the chat model's response on th
 - **Curl Example**:
     
     ```bash
-    curl -X POST http://localhost:3000/api/chat/completions \
+    curl -X POST http://localhost:25142/api/chat/completions \
     -H "Authorization: Bearer YOUR_API_KEY" \
     -H "Content-Type: application/json" \
     -d '{
@@ -643,7 +643,7 @@ This method is beneficial when you want to focus the chat model's response on th
     import requests
     
     def chat_with_file(token, model, query, file_id):
-        url = 'http://localhost:3000/api/chat/completions'
+        url = 'http://localhost:25142/api/chat/completions'
         headers = {
             'Authorization': f'Bearer {token}',
             'Content-Type': 'application/json'
@@ -667,7 +667,7 @@ Leverage a knowledge collection to enhance the response when the inquiry may ben
 - **Curl Example**:
     
     ```bash
-    curl -X POST http://localhost:3000/api/chat/completions \
+    curl -X POST http://localhost:25142/api/chat/completions \
     -H "Authorization: Bearer YOUR_API_KEY" \
     -H "Content-Type: application/json" \
     -d '{
@@ -687,7 +687,7 @@ Leverage a knowledge collection to enhance the response when the inquiry may ben
     import requests
     
     def chat_with_collection(token, model, query, collection_id):
-        url = 'http://localhost:3000/api/chat/completions'
+        url = 'http://localhost:25142/api/chat/completions'
         headers = {
             'Authorization': f'Bearer {token}',
             'Content-Type': 'application/json'
