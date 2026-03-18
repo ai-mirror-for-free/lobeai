@@ -1,8 +1,8 @@
 import json
 import requests
 import pandas as pd
-from tools.db_script import NewApiDatabaseManager
-from tools.logger_manager import LoggerManager
+from tools.DbScript import NewApiDatabaseManager
+from tools.LoggerManager import LoggerManager
 
 logger = LoggerManager(log_file='pricing_process.log')
 db = NewApiDatabaseManager()

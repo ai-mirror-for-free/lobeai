@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from services.NewAPIClient import NewAPIClient
-from tools.logger_manager import LoggerManager
-from tools.vaild import *
+from tools.LoggerManager import LoggerManager
+from tools.RequestVaild import *
 
 # 初始化 FastAPI 应用
 app = FastAPI(title="LobeAI API", version="1.0.0")
@@ -38,7 +38,7 @@ async def register_user(request: RegisterRequest):
     Returns:
         注册成功消息和用户信息
     """
-    from services.creater_users import main_register_user
+    from services.CreaterUsers import main_register_user
     username = request.username
     password = request.password
     email = request.email
@@ -67,16 +67,16 @@ async def buy_package(request: BuyPackageRequest):
     pass
 
 
-@app.post("/api/renew-package")
-async def renew_package(request: RenewPackageRequest):
+@app.post("/api/update-user-quota")
+async def update_user_quota(request: UpdateUserQuotaRequest):
     """
-    4. 用户续费套餐
+    4. 查询并更新用户额度
 
     Args:
-        request: 包含用户ID、套餐ID和续费月数的请求体
+        request: 包含用户ID、操作类型、额度类型和数量的请求体
 
     Returns:
-        续费成功消息和新的过期时间
+        查询结果或更新成功消息
     """
     pass
 

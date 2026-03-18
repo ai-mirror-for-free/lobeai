@@ -155,7 +155,7 @@ class NewAPIClient:
             包含完整 key 的 token dict，如果查询失败则返回 None
         """
         try:
-            from tools.db_script import NewApiDatabaseManager
+            from tools.DbScript import NewApiDatabaseManager
             db = NewApiDatabaseManager()
             db.connect()
             # 数据库表结构: id, user_id, key, status, name, created_time, accessed_time, expired_time, ...

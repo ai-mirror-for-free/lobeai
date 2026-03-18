@@ -5,7 +5,7 @@ import string
 import secrets
 import os
 from dotenv import load_dotenv
-from tools.logger_manager import LoggerManager
+from tools.LoggerManager import LoggerManager
 
 # Configuration - adjust to your Open WebUI instance URL
 load_dotenv()

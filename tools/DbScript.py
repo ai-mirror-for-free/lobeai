@@ -1,7 +1,7 @@
 import os
 import psycopg2
 from dotenv import load_dotenv
-from tools.logger_manager import LoggerManager
+from tools.LoggerManager import LoggerManager
 
 class DatabaseManager:
     """管理 PostgreSQL 数据库的操作类"""

@@ -10,11 +10,11 @@
 # 创建用户
 import json
 import time
-from tools.rate import get_usd_cny_rate
-from tools.logger_manager import LoggerManager
-from tools.pricing_process import PRICING_PLAN
-from tools.db_script import NewApiDatabaseManager, OpenWebUIDatabaseManager
-from services.open_webui_register_users import register_user
+from tools.GetNewestRate import get_usd_cny_rate
+from tools.LoggerManager import LoggerManager
+from tools.PricingProcess import PRICING_PLAN
+from tools.DbScript import NewApiDatabaseManager, OpenWebUIDatabaseManager
+from services.OpenWebuiRegisterUsers import register_user
 from services.NewAPIClient import NewAPIClient, TokenConfig
 
 newapidata = NewApiDatabaseManager()
