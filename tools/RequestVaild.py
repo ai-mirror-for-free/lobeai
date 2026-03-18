@@ -27,7 +27,5 @@ class BuyPackageRequest(BaseModel):
 
 class UpdateUserQuotaRequest(BaseModel):
     """查询并更新用户额度请求"""
-    user_id: str
-    action: str  # 操作类型：query（查询）或 update（更新）
-    quota_type: Optional[str] = None  # 额度类型，如：tokens, requests 等
-    amount: Optional[float] = None  # 更新额度时的数量
+    username: str  
+    email: EmailStr

@@ -78,7 +78,10 @@ async def update_user_quota(request: UpdateUserQuotaRequest):
     Returns:
         查询结果或更新成功消息
     """
-    pass
+    from services.UpdateUserQuotaRequest import get_user_info
+    username = request.username
+    email = request.email
+    return get_user_info(username=request.username, email=request.email)
 
 
 # ==================== 健康检查 ====================
