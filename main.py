@@ -39,6 +39,7 @@ async def register_user(request: RegisterRequest):
         注册成功消息和用户信息
     """
     from services.CreaterUsers import main_register_user
+
     username = request.username
     password = request.password
     email = request.email
@@ -56,7 +57,7 @@ async def register_user(request: RegisterRequest):
 @app.post("/api/buy-package")
 async def buy_package(request: BuyPackageRequest):
     """
-    3. 用户购买新套餐
+    3. 用户购买套餐
 
     Args:
         request: 包含用户ID、套餐ID和数量的请求体
@@ -64,7 +65,14 @@ async def buy_package(request: BuyPackageRequest):
     Returns:
         购买成功消息和订单信息
     """
-    pass
+    from services.BuyPackageRequest import buy_package
+
+    username = request.username
+    email = request.email
+    password = request.password
+    plan_level = request.plan_level
+    buy_mounth = request.buy_mounth
+    return buy_package(username, email, password, plan_level, buy_mounth)
 
 
 @app.post("/api/update-user-quota")
@@ -79,6 +87,7 @@ async def update_user_quota(request: UpdateUserQuotaRequest):
         查询结果或更新成功消息
     """
     from services.UpdateUserQuotaRequest import get_user_info
+
     return get_user_info(username=request.username, email=request.email)
 
 
@@ -93,4 +102,5 @@ async def health_check():
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=25141)

@@ -28,8 +28,6 @@ def fill_pricing_plan():
         json.dump(pricing_plan, f, indent=4)
     return pricing_plan
 
-PRICING_PLAN = fill_pricing_plan()
-
 def get_model_pricing(model_id: str):
     """
     Fetches the input and output pricing for a specific model from OpenRouter.
@@ -192,4 +190,4 @@ def upfdate_model_pricing(ratio=1):
 
 
 if __name__ == "__main__":
-    print(PRICING_PLAN)
+    print(fill_pricing_plan())

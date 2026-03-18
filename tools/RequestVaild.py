@@ -20,12 +20,14 @@ class RegisterRequest(BaseModel):
 
 class BuyPackageRequest(BaseModel):
     """用户购买新套餐请求"""
-    user_id: str
-    package_id: str
-    quantity: int = 1
+    username: str
+    email: EmailStr
+    password: str
+    plan_level: str
+    buy_mounth: int
 
 
 class UpdateUserQuotaRequest(BaseModel):
     """查询并更新用户额度请求"""
-    username: str  
+    username: str
     email: EmailStr

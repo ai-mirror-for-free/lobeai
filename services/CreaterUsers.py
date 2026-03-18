@@ -13,7 +13,7 @@ import time
 from datetime import datetime
 from tools.GetNewestRate import get_usd_cny_rate
 from tools.LoggerManager import LoggerManager
-from tools.PricingProcess import PRICING_PLAN
+from tools.PricingProcess import fill_pricing_plan
 from tools.DbScript import NewApiDatabaseManager, OpenWebUIDatabaseManager
 from services.OpenWebuiRegisterUsers import register_user
 from services.NewAPIClient import NewAPIClient, TokenConfig
@@ -39,6 +39,7 @@ def main_register_user(
 
     # 管理员登录（使用环境变量中的管理员账户）
     newapiclient.login()
+    PRICING_PLAN = fill_pricing_plan()
     model_limits = PRICING_PLAN["free"]["modele_list"]
     expired_time = int(time.time()) + 86400
     # 创建免费试用令牌，1. 全模型可用 2. 额度50000 3。 1 天后过期

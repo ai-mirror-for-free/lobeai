@@ -57,4 +57,6 @@ if __name__ == "__main__":
         "plan_level": 套餐版本,
     }
     """
-    print(get_user_info("2277248178", "2277248178@qq.com"))
+    res = get_user_info("2277248178", "2277248178@qq.com")
+    for key, value in res.items():
+        print(key, value)
