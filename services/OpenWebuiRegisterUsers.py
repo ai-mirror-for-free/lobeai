@@ -6,10 +6,10 @@ import secrets
 import os
 from dotenv import load_dotenv
 from tools.LoggerManager import LoggerManager
+from OpenWebuiAuth import get_admin_token, register_user_as_admin
 
 # Configuration - adjust to your Open WebUI instance URL
 load_dotenv()
-SIGNUP_URL = f"{os.getenv("BASE_URL")}/api/v1/auths/signup"
 logger = LoggerManager()
 
 
@@ -23,27 +23,43 @@ def generate_random_user():
     return name, email, password
 
 
-def register_user(name=None, email=None, password=None):
-
+def register_user(name=None, email=None, password=None, role="user"):
+    """
+    使用管理员权限注册新用户。
+    :param name: 用户名
+    :param email: 用户邮箱
+    :param password: 用户密码
+    :param role: 用户角色，默认为 "user"
+    :return: 注册是否成功
+    """
     logger.info(f"Attempting to register user: {name} ({email})")
 
-    payload = {"name": name, "email": email, "password": password}
-
     try:
-        response = requests.post(SIGNUP_URL, json=payload)
+        # 获取管理员 token
+        admin_token = get_admin_token()
 
-        if response.status_code in [200, 201, 202]:
+        # 使用管理员权限注册用户
+        result = register_user_as_admin(
+            admin_token=admin_token,
+            name=name,
+            email=email,
+            password=password,
+            role=role
+        )
+
+        if result["success"]:
             logger.info(f"Successfully registered user: {name}")
             logger.info(f"Email: {email}")
             logger.info(f"Password: {password}")
+            logger.info(f"Role: {role}")
+            return True
         else:
-            logger.error(
-                f"Failed to register user. Status code: {response.status_code}"
-            )
-            logger.error(f"Response: {response.text}")
+            logger.error(f"Failed to register user: {result['error']}")
+            return False
 
-    except requests.exceptions.RequestException as e:
+    except Exception as e:
         logger.error(f"An error occurred: {e}")
+        return False
 
 
 

@@ -10,6 +10,7 @@
 # 创建用户
 import json
 import time
+from datetime import datetime
 from tools.GetNewestRate import get_usd_cny_rate
 from tools.LoggerManager import LoggerManager
 from tools.PricingProcess import PRICING_PLAN
@@ -39,12 +40,13 @@ def main_register_user(
     # 管理员登录（使用环境变量中的管理员账户）
     newapiclient.login()
     model_limits = PRICING_PLAN["free"]["modele_list"]
+    expired_time = int(time.time()) + 86400
     # 创建免费试用令牌，1. 全模型可用 2. 额度50000 3。 1 天后过期
     trail_token = newapiclient.create_token(
         TokenConfig(
-            name=username,
+            name=email,
             remain_quota=50000,
-            expired_time=int(time.time()) + 86400,
+            expired_time=expired_time,
             unlimited_quota=False,
             model_limits_enabled=True,
             model_limits=",".join(model_limits),
@@ -54,7 +56,7 @@ def main_register_user(
     # 获取完整的 token key
     # NewAPIClient.create_token 会从数据库获取完整的 key，而不是被屏蔽的 key
     token_key = trail_token.get("key")
-    logger.info(f"限制令牌已创建: {token_key}")
+    logger.info("限制令牌已创建")
 
     if not token_key or token_key == "***":
         logger.error(
@@ -93,7 +95,7 @@ def main_register_user(
     newapidata.connect()
     newapidata.execute_command(
         "insert into users_center (name, email, plan_level, plan_price, days_left, quota_left, recharge, token) values (%s, %s, %s, %s, %s, %s, %s, %s)",
-        (username, email, "free", 0, 1, 50000, 50000, token_key),
+        (username, email, "free", 0, expired_time, 50000, 50000, token_key),
     )
     newapidata.disconnect()
     logger.info(f"用户信息已更新: {username}")
