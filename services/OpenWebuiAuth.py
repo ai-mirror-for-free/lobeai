@@ -59,7 +59,6 @@ def get_jwt_token_with_user_info(email, password):
         response.raise_for_status()
 
         data = response.json()
-        print(data)
         token = data.get("token")
 
         # 从返回数据中获取用户 ID (Open WebUI 返回的 id 在根级别)

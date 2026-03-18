@@ -29,7 +29,6 @@ def get_user_info(username, email):
         "expired_time": user_key_info[3],
     }
     update_sql = "update users_center set days_left = %s,quota_left = %s where name = %s and email = %s"
-    expired_time = datetime.fromtimestamp(user_key_info[3])
 
     db.execute_command(
         update_sql,

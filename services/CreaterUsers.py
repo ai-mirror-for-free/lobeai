@@ -29,10 +29,10 @@ def main_register_user(
 ):
 
     # new api 注册
-    user_info = newapiclient.register(
+    newapiclient.register(
         username, password, email, verification_code, aff_code
     )
-    logger.info(f"新用户已创建: {user_info}")
+    logger.info(f"新用户已创建: 用户名:{username}, 邮箱:{email}")
 
     # open webui 注册
     register_user(username, email, password)
@@ -99,7 +99,16 @@ def main_register_user(
     )
     newapidata.disconnect()
     logger.info(f"用户信息已更新: {username}")
-    return f"注册成功，用户名: {username}, 密码: {password}, 邮箱: {email}, 验证码: {verification_code}"
+    return {
+        "success": True,
+        "message": "用户已创建成功",
+        "data": {
+            "username": username,
+            "password": password,
+            "email": email,
+            "verification_code": verification_code,
+        },
+    }
 
 
 if __name__ == "__main__":

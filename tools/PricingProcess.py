@@ -143,7 +143,7 @@ def upfdate_model_pricing(ratio=1):
 
     for model in model_list:
         if model not in newest_pricing:
-            print(f"Model: {model} not found in newest_pricing, skipping")
+            logger.warning(f"Model: {model} not found in newest_pricing, skipping")
             continue
         model_price = newest_pricing[model]
         # 输入价格
