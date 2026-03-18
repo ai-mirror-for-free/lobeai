@@ -28,8 +28,12 @@ def get_user_info(username, email):
         "used_quota": user_key_info[2],
         "expired_time": user_key_info[3],
     }
+    sql = "select plan_level from users_center where name = %s and email = %s"
+    plan_level = db.execute_query(sql, (username, email))
+    plan_level = plan_level[0][0]
+    user_key_info["plan_level"] = plan_level
+    # 更新用户中心 剩余时间，套餐余额
     update_sql = "update users_center set days_left = %s,quota_left = %s where name = %s and email = %s"
-
     db.execute_command(
         update_sql,
         (
@@ -39,7 +43,18 @@ def get_user_info(username, email):
             email,
         ),
     )
+    db.disconnect()
+    return user_key_info
 
 
 if __name__ == "__main__":
-    get_user_info("", "测试")
+    """
+    {
+        "remain_quota": 剩余额度,
+        "model_limits": 可用模型列表
+        "used_quota": 当前套餐已经使用的额度,
+        "expired_time": 过期时间时间戳,
+        "plan_level": 套餐版本,
+    }
+    """
+    print(get_user_info("2277248178", "2277248178@qq.com"))

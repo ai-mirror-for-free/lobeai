@@ -95,7 +95,7 @@ def main_register_user(
     newapidata.connect()
     newapidata.execute_command(
         "insert into users_center (name, email, plan_level, plan_price, days_left, quota_left, recharge, token) values (%s, %s, %s, %s, %s, %s, %s, %s)",
-        (username, email, "free", 0, expired_time, 50000, 50000, token_key),
+        (username, email, "free", 0, expired_time, 50000, 0, token_key),
     )
     newapidata.disconnect()
     logger.info(f"用户信息已更新: {username}")

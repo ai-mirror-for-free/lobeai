@@ -9,19 +9,23 @@ db = NewApiDatabaseManager()
 data = pd.read_excel("data/pricing_plan.xlsx")
 model_list = data["model"].to_list()
 
-def fill_pricing_plan(): 
-    # 套餐价格
-    pricing_plan = {
-        "free": {"price": 0, "modele_list": []},
-        "basic": {"price": 29, "modele_list": []},
-        "pro": {"price": 49, "modele_list": []},
-        "enterprise": {"price": 99, "modele_list": []},
-    }
+def fill_pricing_plan():
+    # 从 JSON 文件读取套餐价格
+    with open("data/pricing_plan.json", "r", encoding="utf-8") as f:
+        pricing_plan = json.load(f)
+
+    # 清空现有的模型列表，重新填充
+    for plan_name in pricing_plan:
+        pricing_plan[plan_name]["modele_list"] = []
+
+    # 根据 Excel 数据填充模型列表
     for model in model_list:
-        for plan_name, plan_data in pricing_plan.items():
+        for plan_name in pricing_plan.keys():
             if not int(data[data["model"] == model][plan_name].values[0]):
                 continue
             pricing_plan[plan_name]["modele_list"].append(model)
+    with open("data/pricing_plan.json", "w", encoding="utf-8") as f:
+        json.dump(pricing_plan, f, indent=4)
     return pricing_plan
 
 PRICING_PLAN = fill_pricing_plan()
@@ -188,4 +192,4 @@ def upfdate_model_pricing(ratio=1):
 
 
 if __name__ == "__main__":
-    upfdate_model_pricing()
+    print(PRICING_PLAN)
