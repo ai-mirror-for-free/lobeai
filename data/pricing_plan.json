@@ -20,7 +20,7 @@
         ]
     },
     "basic": {
-        "price": 29,
+        "price": 1,
         "modele_list": [
             "anthropic/claude-haiku-4.5",
             "google/gemini-2.0-flash-001",
@@ -30,7 +30,7 @@
         ]
     },
     "pro": {
-        "price": 49,
+        "price": 2,
         "modele_list": [
             "anthropic/claude-haiku-4.5",
             "anthropic/claude-sonnet-4.6",
@@ -46,7 +46,7 @@
         ]
     },
     "enterprise": {
-        "price": 99,
+        "price": 4,
         "modele_list": [
             "anthropic/claude-haiku-4.5",
             "anthropic/claude-opus-4.6",

@@ -15,9 +15,7 @@ newapiclient = NewAPIClient()
 openwebuidata = OpenWebUIDatabaseManager()
 
 
-def buy_package(
-    username: str, email: str, password: str, plan_level: str, buy_mounth: int
-):
+def buy_package(username: str, email: str, password: str, plan_level: str, days: int):
     """
     1. 验证用户登录
     2. 登录错误返回用户账号密码错误
@@ -27,7 +25,7 @@ def buy_package(
     5. 创建成功后，返回新的 token并复用到 setting
     """
     PRICING_PLAN = fill_pricing_plan()
-    assert buy_mounth > 0, {"status": False, "message": f" 购买时长不能小于1个月"}
+    assert days > 0, {"status": False, "message": f" 购买时长不能小于1个月"}
     assert plan_level in PRICING_PLAN, {"status": False, "message": f"套餐级别错误"}
     # 验证用户登录
     try:
@@ -58,10 +56,15 @@ def buy_package(
     rate, local = rate_result  # 获取汇率值
     if not local:
         logger.error("获取汇率失败, 请检查网络")
-    remain_quota += plan_info["price"] * buy_mounth / rate * 500000
-    remain_quota = int(remain_quota / 100) * 100
+    # 购买天数,超过 30 天正常额度，低于 30 天打 8折
+    if days >= 30:
+        remain_quota += plan_info["price"] * days / rate * 500000
+    else:
+        remain_quota += plan_info["price"] * days / rate * 500000 * 0.8
+    remain_quota = int(remain_quota)
     model_limits = plan_info["modele_list"]
-    expired_time += buy_mounth * 30 * 86400
+    expired_time = max(expired_time, int(time.time()))
+    expired_time += days * 86400
     # 创建新的 token 1. 过期时间为buy_mounth月 2. 模型列表为 model_limits. 3. 额度为 remain_quota
     newapiclient.login()
     trail_token = newapiclient.create_token(

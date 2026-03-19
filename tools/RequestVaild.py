@@ -24,7 +24,7 @@ class BuyPackageRequest(BaseModel):
     email: EmailStr
     password: str
     plan_level: str
-    buy_mounth: int
+    days: int
 
 
 class UpdateUserQuotaRequest(BaseModel):

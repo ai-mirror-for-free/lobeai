@@ -58,12 +58,11 @@ async def register_user(request: RegisterRequest):
 async def buy_package(request: BuyPackageRequest):
     """
     3. 用户购买套餐
-
-    Args:
-        request: 包含用户ID、套餐ID和数量的请求体
-
-    Returns:
-        购买成功消息和订单信息
+    username: 用户名
+    email: 用户邮箱
+    password: 用户密码
+    plan_level: 套餐等级
+    days: 购买天数
     """
     from services.BuyPackageRequest import buy_package
 
@@ -71,8 +70,8 @@ async def buy_package(request: BuyPackageRequest):
     email = request.email
     password = request.password
     plan_level = request.plan_level
-    buy_mounth = request.buy_mounth
-    return buy_package(username, email, password, plan_level, buy_mounth)
+    days = request.days
+    return buy_package(username, email, password, plan_level, days)
 
 
 @app.post("/api/update-user-quota")
