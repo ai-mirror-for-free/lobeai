@@ -76,6 +76,7 @@ def buy_package(username: str, email: str, password: str, plan_level: str, days:
             unlimited_quota=False,
             model_limits_enabled=True,
             model_limits=",".join(model_limits),
+            group=plan_level,
         )
     )
     newapiclient.logout()

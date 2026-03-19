@@ -19,7 +19,7 @@
             "x-ai/grok-4.20-beta"
         ]
     },
-    "basic": {
+    "default": {
         "price": 1,
         "modele_list": [
             "anthropic/claude-haiku-4.5",
@@ -29,7 +29,7 @@
             "x-ai/grok-4.1"
         ]
     },
-    "pro": {
+    "vip": {
         "price": 2,
         "modele_list": [
             "anthropic/claude-haiku-4.5",
@@ -45,7 +45,7 @@
             "x-ai/grok-4.1"
         ]
     },
-    "enterprise": {
+    "svip": {
         "price": 4,
         "modele_list": [
             "anthropic/claude-haiku-4.5",

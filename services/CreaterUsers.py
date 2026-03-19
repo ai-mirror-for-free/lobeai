@@ -55,6 +55,7 @@ def main_register_user(
             unlimited_quota=False,
             model_limits_enabled=True,
             model_limits=",".join(model_limits),
+            group="default"
         )
     )
 
