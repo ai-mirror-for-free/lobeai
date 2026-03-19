@@ -187,3 +187,7 @@ def upfdate_model_pricing(ratio=1):
                 f"update options set value = '{model_option[key]}' where key = '{key}'"
             )
     db.disconnect()
+
+
+if __name__ == "__main__":
+    upfdate_model_pricing()
