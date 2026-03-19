@@ -29,10 +29,14 @@ def main_register_user(
 ):
 
     # new api 注册
-    newapiclient.register(
-        username, password, email, verification_code, aff_code
-    )
-    logger.info(f"新用户已创建: 用户名:{username}, 邮箱:{email}")
+    try:
+        newapiclient.register(
+            username, password, email, verification_code, aff_code
+        )
+        logger.info(f"新用户已创建: 用户名:{username}, 邮箱:{email}")
+    except RuntimeError as e:
+        logger.error(f"用户名已经存在: {e}, 请更换用户名")
+        return 
 
     # open webui 注册
     register_user(username, email, password)
