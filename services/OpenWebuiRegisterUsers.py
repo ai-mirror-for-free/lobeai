@@ -6,7 +6,7 @@ import secrets
 import os
 from dotenv import load_dotenv
 from tools.LoggerManager import LoggerManager
-from OpenWebuiAuth import get_admin_token, register_user_as_admin
+from services.OpenWebuiAuth import get_admin_token, register_user_as_admin
 
 # Configuration - adjust to your Open WebUI instance URL
 load_dotenv()
