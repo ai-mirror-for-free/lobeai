@@ -22,7 +22,8 @@ def buy_package(username: str, email: str, password: str, plan_level: str, days:
     3. 登录成功后，查询用户当前 套餐级别和剩余余额
     4. 依据用户套餐级别和余额,计算新的额度和模型列表，并调用 new api 创建新的 token
     5. 删除旧的 token
-    5. 创建成功后，返回新的 token并复用到 setting
+    6. 创建成功后，返回新的 token并复用到 setting
+    7. 记录用户充值
     """
     PRICING_PLAN = fill_pricing_plan()
     assert days > 0, {"status": False, "message": f" 购买时长不能小于1个月"}
@@ -127,6 +128,21 @@ def buy_package(username: str, email: str, password: str, plan_level: str, days:
             username,
         ),
     )
+    """
+    CREATE TABLE user_recharge (
+    id SERIAL PRIMARY KEY,              -- 自增 ID，主键
+    user_id VARCHAR(50) NOT NULL,       -- 用户标识/ID
+    email VARCHAR(100),                 -- 邮箱
+    recharge_days INTEGER NOT NULL,     -- 充值天数
+    recharge_amount NUMERIC(10, 2),     -- 充值金额 (支持两位小数)
+    recharge_time TIMESTAMP DEFAULT NOW() -- 充值时间 (默认为当前时间)
+);
+    """
+
+    # 记录充值信息
+    sql = "insert into user_recharge (user_id, email, recharge_days, recharge_amount) values (%s, %s, %s, %s)"
+    new_api_db.execute_command(sql, (username, email, days, days*plan_info["price"]))
+
     # 删除旧的 token
     sql = "delete from tokens where key = %s"
     new_api_db.execute_command(sql, (token_old,))
