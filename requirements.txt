@@ -6,3 +6,4 @@ pandas
 fastapi
 pydantic
 email-validator
+cryptography

@@ -2,6 +2,7 @@
 import os
 import requests
 from dotenv import load_dotenv
+from tools.password_encryption import get_decrypted_password
 
 
 def get_jwt_token(email, password):
@@ -126,10 +127,11 @@ def get_admin_token():
     """
     load_dotenv()
     email = os.environ.get("ADMIN_EMAIL")
-    password = os.environ.get("ADMIN_PASSWORD")
+    # 从环境变量读取加密的密码并解密
+    password = get_decrypted_password("ADMIN_PASSWORD_ENCRYPTED")
 
-    if not email or not password:
-        raise Exception("请设置 ADMIN_EMAIL 和 ADMIN_PASSWORD 环境变量")
+    if not email:
+        raise Exception("请设置 ADMIN_EMAIL 环境变量")
 
     result = get_jwt_token_with_user_info(email, password)
     return result["token"]

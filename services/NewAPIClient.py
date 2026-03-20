@@ -7,6 +7,7 @@ import os
 import requests
 from dataclasses import dataclass, field
 from dotenv import load_dotenv
+from tools.password_encryption import get_decrypted_password
 
 @dataclass
 class TokenConfig:
@@ -53,7 +54,8 @@ class NewAPIClient:
             RuntimeError: 登录失败时抛出，包含错误信息
         """
         username = os.environ.get("NEWAPI_USER")
-        password = os.environ.get("NEWAPI_PASSWORD")
+        # 从环境变量读取加密的 NewAPI 密码并解密
+        password = get_decrypted_password("NEWAPI_PASSWORD_ENCRYPTED")
         resp = self.session.post(
             f"{self.base_url}/api/user/login",
             json={"username": username, "password": password},

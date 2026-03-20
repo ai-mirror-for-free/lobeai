@@ -2,6 +2,7 @@ import os
 import psycopg2
 from dotenv import load_dotenv
 from tools.LoggerManager import LoggerManager
+from tools.password_encryption import get_decrypted_password
 
 class DatabaseManager:
     """管理 PostgreSQL 数据库的操作类"""
@@ -11,7 +12,8 @@ class DatabaseManager:
         self.host = os.getenv("DB_HOST", "localhost")
         self.port = os.getenv("DB_PORT", "5432")
         self.user = os.getenv("DB_USERNAME")
-        self.password = os.getenv("DB_PASSWORD")
+        # 从环境变量读取加密的数据库密码并解密
+        self.password = get_decrypted_password("DB_PASSWORD_ENCRYPTED")
         self.dbname = db_name
         self.conn = None
         self.logger = LoggerManager()
