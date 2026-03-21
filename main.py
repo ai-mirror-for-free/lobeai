@@ -1,13 +1,142 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends, Header
 from services.NewAPIClient import NewAPIClient
 from tools.LoggerManager import LoggerManager
 from tools.RequestVaild import *
+from services.AdminAuth import AdminAuth
+from services.RedemptionService import RedemptionService, GenerateRedemptionRequest
 
 # 初始化 FastAPI 应用
 app = FastAPI(title="LobeAI API", version="1.0.0")
 loggre = LoggerManager()
 new_api_client = NewAPIClient()
+redemption_service = RedemptionService()
+
+
+# 依赖函数，用于验证管理员token
+async def get_current_admin(authorization: str = Header(...)):
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="授权头格式错误")
+    
+    token = authorization[7:]  # 移除 "Bearer " 前缀
+    username = AdminAuth.verify_token(token)
+    
+    if username is None:
+        raise HTTPException(status_code=401, detail="无效或过期的令牌")
+    
+    return username
+
+
 # ==================== API 端点 ====================
+
+
+@app.post("/api/admin/login")
+async def admin_login(request: AdminLoginRequest):
+    """
+    管理员登录，成功后返回JWT token
+    """
+    try:
+        if AdminAuth.verify_admin_credentials(request.username, request.password):
+            token_data = {"sub": request.username}
+            token = AdminAuth.create_access_token(token_data)
+            return {"access_token": token, "token_type": "bearer"}
+        else:
+            raise HTTPException(status_code=401, detail="用户名或密码错误")
+    except ValueError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"登录过程中发生错误: {str(e)}")
+
+
+@app.get("/api/admin/redemption-codes")
+async def get_redemption_codes(
+    request: GetRedemptionCodesRequest = Depends(),
+    current_admin = Depends(get_current_admin)
+):
+    """
+    查询兑换码列表，需要管理员token
+    """
+    try:
+        redemption_codes = redemption_service.get_filtered_redemption_codes(
+            limit=request.limit,
+            offset=request.offset,
+            is_exchanged=request.is_exchanged,
+            plan=request.plan
+        )
+        total = redemption_service.get_redemption_codes_count()
+        
+        return {
+            "data": redemption_codes,
+            "total": total,
+            "limit": request.limit,
+            "offset": request.offset
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"查询兑换码时发生错误: {str(e)}")
+
+
+@app.post("/api/admin/generate-redemption-codes")
+async def generate_redemption_codes(
+    request: GenerateRedemptionCodesRequest,
+    current_admin = Depends(get_current_admin)
+):
+    """
+    批量生成兑换码，需要管理员token
+    前端传入生成数量和套餐类型
+    """
+    try:
+        generated_codes = redemption_service.batch_generate_redemption_codes(
+            count=request.count,
+            plan=request.plan
+        )
+        
+        return {
+            "generated_codes": generated_codes,
+            "count": len(generated_codes),
+            "plan": request.plan
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"生成兑换码时发生错误: {str(e)}")
+
+
+@app.post("/api/admin/delete-redemption-codes")
+async def delete_redemption_codes(
+    request: DeleteRedemptionCodesRequest,
+    current_admin = Depends(get_current_admin)
+):
+    """
+    批量删除兑换码，需要管理员token
+    接收要删除的兑换码ID列表
+    """
+    try:
+        deleted_count = redemption_service.batch_delete_redemption_codes(request.ids)
+        
+        return {
+            "deleted_count": deleted_count,
+            "ids": request.ids
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"删除兑换码时发生错误: {str(e)}")
+
+
+@app.post("/api/redeem-code")
+async def redeem_code(request: RedeemCodeRequest):
+    """
+    用户兑换兑换码，更新用户email并将兑换标志设为True
+    如果兑换码已经被兑换，则返回错误
+    """
+    try:
+        result = redemption_service.redeem_code(request.code, request.email)
+        
+        return {
+            "message": "兑换成功",
+            "redeemed_code": result
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"兑换过程中发生错误: {str(e)}")
 
 
 @app.post("/api/send-verification-code")
