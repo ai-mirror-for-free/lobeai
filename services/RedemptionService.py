@@ -315,7 +315,7 @@ class RedemptionService:
         """
         # 查询当前用户的信息，包括当前套餐类型和剩余配额
         select_query = """
-        SELECT remain_quota, expired_time, status, name
+        SELECT remain_quota, expired_time, status, name, "group" 
         FROM public.tokens 
         WHERE name = %s AND deleted_at IS NULL
         """
@@ -326,8 +326,7 @@ class RedemptionService:
             # 如果找不到对应用户，跳过更新
             return
         
-        current_remain_quota, current_expired_time, current_status, token_name = result
-        current_plan = self._get_plan_from_quota(current_remain_quota)
+        current_remain_quota, current_expired_time, current_status, token_name, current_plan = result
         
         # 计算新的过期时间和额度
         new_expired_time, new_remain_quota = self._calculate_new_expiry_and_quota(
