@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from pydantic import BaseModel
 import secrets
 import string
+from dateutil.relativedelta import relativedelta
 
 # 导入NewApiDatabaseManager
 from tools.DbScript import NewApiDatabaseManager
@@ -168,7 +169,7 @@ class RedemptionService:
                 # 获取plan类型
                 plan = result[6]
                 
-                # 更新兑换码状态，将email设为email
+                # 更新兑换码状态，将email设为用户email
                 update_query = """
                 UPDATE public.exchange 
                 SET email = %s, is_exchange = true, exchange_time = %s
@@ -178,14 +179,33 @@ class RedemptionService:
                 cursor.execute(update_query, (email, datetime.now(), code))
                 updated_result = cursor.fetchone()
                 
+                # 检查是否确实更新了行
+                if updated_result is None:
+                    # 可能由于某些原因RETURNING子句没有返回结果，但我们应该检查受影响的行数
+                    if cursor.rowcount == 0:
+                        raise ValueError("更新失败：没有匹配的兑换码被更新")
+                    # 如果RETURNING没返回但rowcount>0，重新查询获取更新后的数据
+                    else:
+                        select_query = """
+                        SELECT id, email, exchange_code, is_exchange, created_time, exchange_time, plan
+                        FROM public.exchange 
+                        WHERE exchange_code = %s
+                        """
+                        cursor.execute(select_query, (code,))
+                        updated_result = cursor.fetchone()
+                
+                print("更新后的兑换码信息:", updated_result)
+                
                 # 根据plan类型给用户充值相应额度
                 quota_amount = self._get_quota_by_plan(plan)
-                self._recharge_user_quota(email, plan, quota_amount)
+                
+                # 更新用户额度（使用相同的数据库连接和事务）
+                self._recharge_user_quota_with_cursor(cursor, email, plan, quota_amount)
+                
+                # 更新tokens表（使用相同的数据库连接和事务）
+                self._update_tokens_table_with_cursor(cursor, email, plan, quota_amount)
                 
                 self.db.conn.commit()
-                
-                if updated_result is None:
-                    raise ValueError("更新失败")
                 
                 return RedemptionCode(
                     id=updated_result[0],
@@ -215,40 +235,155 @@ class RedemptionService:
         
         return plan_quotas.get(plan, 0)
 
-    def _recharge_user_quota(self, email: str, plan: str, quota_amount: int):
+    def _recharge_user_quota_with_cursor(self, cursor, email: str, plan: str, quota_amount: int):
         """
         为用户充值额度，根据email更新用户信息
+        :param cursor: 数据库游标
+        :param email: 用户邮箱
+        :param plan: 套餐类型
+        :param quota_amount: 额度数量
         """
-        self.db.connect()
-        try:
-            with self.db.conn.cursor() as cursor:
-                # 更新用户额度，参考CreaterUsers.py中的SQL语句
-                # insert into users_center (name, email, plan_level, plan_price, days_left, quota_left, recharge, token) values (%s, %s, %s, %s, %s, %s, %s, %s)
+        # 首先检查用户是否存在
+        check_user_query = "SELECT COUNT(*) FROM users_center WHERE email = %s"
+        cursor.execute(check_user_query, (email,))
+        user_exists = cursor.fetchone()[0] > 0
+        
+        if user_exists:
+            # 获取当前用户的plan_level和days_left，以决定是否为同一套餐
+            get_current_info_query = "SELECT plan_level, days_left, quota_left FROM users_center WHERE email = %s"
+            cursor.execute(get_current_info_query, (email,))
+            result = cursor.fetchone()
+            
+            if result is None:
+                raise ValueError(f"用户不存在: {email}")
                 
-                # 首先检查用户是否存在
-                check_user_query = "SELECT COUNT(*) FROM users_center WHERE email = %s"
-                cursor.execute(check_user_query, (email,))
-                user_exists = cursor.fetchone()[0] > 0
+            current_plan, current_days_left, quota_left = result
+            print(current_plan, current_days_left, quota_left)
+            
+            is_same_plan = current_plan == plan
+            
+            import datetime
+            from datetime import datetime as dt
+            
+            if is_same_plan:
+                print(current_days_left)
+                # 如果是同一套餐，保留原有的过期时间并增加额度
+                new_days_left = current_days_left + (30 * 24 * 3600)  
+                print(new_days_left)
                 
-                if user_exists:
-                    # 用户存在，更新现有记录
-                    update_user_quota_query = """
-                    UPDATE users_center 
-                    SET quota_left = quota_left + %s, 
-                        recharge = recharge + %s,
-                        plan_level = %s
-                    WHERE email = %s
-                    """
-                    cursor.execute(update_user_quota_query, (quota_amount, quota_amount, plan, email))
-                else:
-                    # 用户不存在，可能需要先注册用户或者报错
-                    raise ValueError(f"用户不存在: {email}")
+                # 使用SQL表达式更新数值，符合数据库规范
+                update_user_quota_query = """
+                UPDATE users_center 
+                SET days_left = %s,
+                    quota_left = quota_left + %s, 
+                    recharge = recharge + %s,
+                    plan_level = %s
+                WHERE email = %s
+                """
+                cursor.execute(update_user_quota_query, (new_days_left, quota_amount, quota_amount, plan, email))
+            else:
+                # 如果是不同套餐，更新过期时间为当前时间加一个月，并重置额度
+                # 将当前时间转换为整数时间戳，防止浮点数问题
+                new_days_left = int(dt.now().timestamp()) + (30 * 24 * 3600)  # 秒时间戳，加一个月
                 
-                # self.db.conn.commit()
-        except Exception as e:
-            raise e
-        # finally:
-        #     self.db.disconnect()
+                # 检查时间戳是否超出范围，防止整数溢出
+                if new_days_left > 2147483647:  # 32位整数最大值
+                    raise ValueError("计算出的时间戳超出范围")
+                    
+                # 使用SQL表达式更新数值，符合数据库规范
+                update_user_quota_query = """
+                UPDATE users_center 
+                SET days_left = %s,
+                    quota_left = %s, 
+                    recharge = recharge + %s,
+                    plan_level = %s
+                WHERE email = %s
+                """
+                cursor.execute(update_user_quota_query, (new_days_left, quota_amount, quota_amount, plan, email))
+        else:
+            # 用户不存在，可能需要先注册用户或者报错
+            raise ValueError(f"用户不存在: {email}")
+
+
+    def _update_tokens_table_with_cursor(self, cursor, email: str, plan: str, quota_amount: int):
+        """
+        更新tokens表中的相关字段
+        :param cursor: 数据库游标
+        :param email: 用户邮箱
+        :param plan: 套餐类型
+        :param quota_amount: 额度数量
+        """
+        # 查询当前用户的信息，包括当前套餐类型和剩余配额
+        select_query = """
+        SELECT remain_quota, expired_time, status, name
+        FROM public.tokens 
+        WHERE name = %s AND deleted_at IS NULL
+        """
+        cursor.execute(select_query, (email,))
+        result = cursor.fetchone()
+        
+        if not result:
+            # 如果找不到对应用户，跳过更新
+            return
+        
+        current_remain_quota, current_expired_time, current_status, token_name = result
+        current_plan = self._get_plan_from_quota(current_remain_quota)
+        
+        # 计算新的过期时间和额度
+        new_expired_time, new_remain_quota = self._calculate_new_expiry_and_quota(
+            current_plan, plan, current_expired_time, current_remain_quota, quota_amount
+        )
+        print(f"当前套餐: {current_plan}, 当前剩余额度: {current_remain_quota}, 当前过期时间: {datetime.fromtimestamp(current_expired_time) if current_expired_time else '无'}, 充值后新套餐: {plan}, 新剩余额度: {new_remain_quota}, 新过期时间: {datetime.fromtimestamp(new_expired_time)}")
+        # 如果当前状态不是1，则更新为1
+        new_status = 1 if current_status != 1 else current_status
+        
+        # 更新tokens表
+        update_query = """
+        UPDATE public.tokens 
+        SET expired_time = %s, 
+            remain_quota = %s, 
+            status = %s
+        WHERE name = %s AND deleted_at IS NULL
+        """
+        cursor.execute(update_query, (new_expired_time, new_remain_quota, new_status, email))
+
+    def _calculate_new_expiry_and_quota(self, current_plan, plan, current_expired_time, current_remain_quota, quota_amount):
+        """
+        计算新的过期时间和额度
+        """
+        import datetime
+        from datetime import datetime as dt
+        
+        # 判断套餐类型是否相同
+        is_same_plan = current_plan == plan
+        # 计算一个月的时间增量（秒数）
+        month_seconds = 30 * 24 * 3600
+        
+        # 如果套餐类型相同，额度叠加；否则重置为新套餐的额度
+        if is_same_plan:
+            new_remain_quota = current_remain_quota + quota_amount
+            # 在当前过期时间基础上延长一个月
+            new_expired_time = current_expired_time + month_seconds
+        else:
+            new_remain_quota = quota_amount
+            # 计算新的过期时间，当前时间加上一个月
+            new_expired_time = int(dt.now().timestamp()) + month_seconds  # 加上一个月的秒数
+        
+        return new_expired_time, new_remain_quota
+
+    def _get_plan_from_quota(self, quota: int) -> str:
+        """
+        根据额度反推套餐类型
+        """
+        if quota == 500000:
+            return "vip"
+        elif quota == 1000000:
+            return "svip"
+        elif quota == 5000000:
+            return "至尊版"
+        else:
+            # 如果无法确定套餐类型，返回一个默认值或None
+            return None
 
     def get_redemption_codes(self, limit: int = 100, offset: int = 0) -> List[RedemptionCode]:
         """
