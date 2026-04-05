@@ -10,7 +10,6 @@ from dotenv import load_dotenv
 from tools.password_encryption import (
     generate_encryption_key,
     encrypt_password,
-    get_encryption_key
 )
 
 

@@ -94,7 +94,7 @@ def buy_package(username: str, email: str, password: str, plan_level: str, days:
         "ui": {
             "version": "0.8.10",
             "directConnections": {
-                "OPENAI_API_BASE_URLS": ["https://filter.yang-sjq.cn/v1"],
+                "OPENAI_API_BASE_URLS": ["https://filter.chat-keeper.com/v1"],
                 "OPENAI_API_KEYS": [token_key],
                 "OPENAI_API_CONFIGS": {
                     "0": {
