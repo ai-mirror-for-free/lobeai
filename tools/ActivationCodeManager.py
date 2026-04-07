@@ -207,17 +207,16 @@ class ActivationCodeManager:
 
     def random_code(self, code: str, used_by: str) -> tuple[bool, str, dict]:
         """
-        兑换激活码
+        验证激活码（仅验证，不标记已使用）
 
         流程:
         1. 解析激活码 + 签名验证
         2. 从数据库查找（encrypted_code 无法直接查，用 code_id 查）
         3. 检查是否已使用
         4. 解密激活码并匹配
-        5. 删除激活码
 
         Returns:
-            (success, message, plan_info)
+            (success, message, plan_info) - plan_info 包含 code_id 用于后续标记
         """
         # 1. 解析并验证签名
         parsed = parse_activation_code(code)
@@ -256,11 +255,10 @@ class ActivationCodeManager:
                 db_record["days"] != parsed["days"]):
             return False, "激活码信息被篡改", {}
 
-        # 7. 兑换成功 → 删除激活码
-        self.delete_by_code_id(code_id)
-        logger.info(f"激活码兑换成功: code_id={code_id}, used_by={used_by}")
-
-        return True, "激活成功", {
+        # 验证成功，返回 code_id 用于后续标记已使用
+        logger.info(f"激活码验证成功: code_id={code_id}")
+        return True, "验证成功", {
             "plan_level": parsed["plan_level"],
             "days": parsed["days"],
+            "code_id": code_id,
         }
