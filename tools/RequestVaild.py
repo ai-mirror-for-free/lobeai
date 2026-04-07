@@ -43,6 +43,4 @@ class RandomActivationCodeRequest(BaseModel):
 
 class GenerateActivationCodesRequest(BaseModel):
     """批量生成激活码请求（仅管理员）"""
-    plan_levels: list[str]
-    days_list: list[int]
-    counts: dict[str, int] = {}
+    tasks: list[list] = []  # 格式: [[plan_level, days, count], ...]

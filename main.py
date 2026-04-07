@@ -94,16 +94,12 @@ async def random_activation_code(request: RandomActivationCodeRequest):
 async def generate_activation_codes(request: GenerateActivationCodesRequest):
     """
     【管理员】批量生成激活码接口
-    plan_levels: 套餐级别列表，如 ["default", "vip", "svip"]
-    days_list: 天数列表，如 [1, 30, 90]
-    counts: 每个组合的生成数量，如 {"vip_30": 50, "svip_90": 20}
+    tasks: 格式为 [[plan_level, days, count], ...]
     """
     from services.GenerateActivationCodes import batch_generate_activation_codes
 
     return batch_generate_activation_codes(
-        plan_levels=request.plan_levels,
-        days_list=request.days_list,
-        counts=request.counts,
+        tasks=request.tasks
     )
 
 
