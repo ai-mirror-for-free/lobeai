@@ -2,7 +2,7 @@ import time
 import json
 from services.OpenWebuiAuth import get_jwt_token
 from tools.LoggerManager import LoggerManager
-from tools.PricingProcess import fill_pricing_plan
+from func.PricingProcess import fill_pricing_plan
 from tools.GetNewestRate import get_usd_cny_rate
 from tools.DbScript import NewApiDatabaseManager, OpenWebUIDatabaseManager
 from services.NewAPIClient import NewAPIClient, TokenConfig

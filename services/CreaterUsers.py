@@ -13,7 +13,7 @@ import time
 from datetime import datetime
 from tools.GetNewestRate import get_usd_cny_rate
 from tools.LoggerManager import LoggerManager
-from tools.PricingProcess import fill_pricing_plan
+from func.PricingProcess import fill_pricing_plan
 from tools.DbScript import NewApiDatabaseManager, OpenWebUIDatabaseManager
 from services.OpenWebuiRegisterUsers import register_user
 from services.NewAPIClient import NewAPIClient, TokenConfig

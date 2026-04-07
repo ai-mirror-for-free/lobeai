@@ -4,7 +4,7 @@
 """
 from tools.LoggerManager import LoggerManager
 from tools.ActivationCodeManager import ActivationCodeManager
-from tools.PricingProcess import fill_pricing_plan
+from func.PricingProcess import fill_pricing_plan
 
 logger = LoggerManager(log_file="activation_code.log")
 
