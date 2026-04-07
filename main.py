@@ -74,6 +74,39 @@ async def buy_package(request: BuyPackageRequest):
     return buy_package(username, email, password, plan_level, days)
 
 
+@app.post("/api/random-activation-code")
+async def random_activation_code(request: RandomActivationCodeRequest):
+    """
+    激活码兑换接口
+    验证激活码 → 调用 buy_package 充值 → 删除数据库激活码
+    """
+    from services.RandomActivationCode import random_activation_code
+
+    return random_activation_code(
+        code=request.code,
+        username=request.username,
+        email=request.email,
+        password=request.password,
+    )
+
+
+@app.post("/api/admin/generate-activation-codes")
+async def generate_activation_codes(request: GenerateActivationCodesRequest):
+    """
+    【管理员】批量生成激活码接口
+    plan_levels: 套餐级别列表，如 ["default", "vip", "svip"]
+    days_list: 天数列表，如 [1, 30, 90]
+    counts: 每个组合的生成数量，如 {"vip_30": 50, "svip_90": 20}
+    """
+    from services.GenerateActivationCodes import batch_generate_activation_codes
+
+    return batch_generate_activation_codes(
+        plan_levels=request.plan_levels,
+        days_list=request.days_list,
+        counts=request.counts,
+    )
+
+
 @app.post("/api/update-user-quota")
 async def update_user_quota(request: UpdateUserQuotaRequest):
     """

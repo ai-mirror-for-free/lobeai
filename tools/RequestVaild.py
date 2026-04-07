@@ -31,3 +31,18 @@ class UpdateUserQuotaRequest(BaseModel):
     """查询并更新用户额度请求"""
     username: str
     email: EmailStr
+
+
+class RandomActivationCodeRequest(BaseModel):
+    """激活码兑换请求"""
+    code: str
+    username: str
+    email: str
+    password: str
+
+
+class GenerateActivationCodesRequest(BaseModel):
+    """批量生成激活码请求（仅管理员）"""
+    plan_levels: list[str]
+    days_list: list[int]
+    counts: dict[str, int] = {}
