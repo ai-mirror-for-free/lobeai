@@ -6,7 +6,6 @@ from tools.RequestVaild import *
 # 初始化 FastAPI 应用
 app = FastAPI(title="LobeAI API", version="1.0.0")
 loggre = LoggerManager()
-new_api_client = NewAPIClient()
 # ==================== API 端点 ====================
 
 
@@ -18,6 +17,7 @@ async def send_verification_code(request: SendVerificationCodeRequest):
         request: 包含邮箱地址的请求体
     """
     email = request.email
+    new_api_client = NewAPIClient()
     try:
         new_api_client.send_verification_code(email)
         loggre.info("验证码已发送，请检查邮箱")
@@ -77,16 +77,14 @@ async def generate_activation_codes(request: GenerateActivationCodesRequest):
     tasks: 格式为 [[plan_level, days, count], ...]
     """
     from services.GenerateActivationCodes import batch_generate_activation_codes
-
-    # 使用提供的管理员凭证登录 NewAPI
+    # 每次请求创建独立实例，避免污染全局 session
+    admin_client = NewAPIClient()
     try:
-        new_api_client.session.headers.pop("New-Api-User", None)
-        new_api_client.session.cookies.clear()
-        username = request.username
-        password = request.password
-        resp = new_api_client.session.post(
-            f"{new_api_client.base_url}/api/user/login",
-            json={"username": username, "password": password},
+        admin_client.session.headers.pop("New-Api-User", None)
+        admin_client.session.cookies.clear()
+        resp = admin_client.session.post(
+            f"{admin_client.base_url}/api/user/login",
+            json={"username": request.username, "password": request.password},
         )
         resp.raise_for_status()
         data = resp.json()
@@ -95,7 +93,7 @@ async def generate_activation_codes(request: GenerateActivationCodesRequest):
         user_data = data.get("data", {})
         user_id = user_data.get("id")
         if user_id:
-            new_api_client.session.headers.update({"New-Api-User": str(user_id)})
+            admin_client.session.headers.update({"New-Api-User": str(user_id)})
     except Exception as e:
         raise HTTPException(status_code=401, detail=f"管理员认证失败: {e}")
 
