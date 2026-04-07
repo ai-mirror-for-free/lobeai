@@ -53,6 +53,7 @@ def batch_generate_activation_codes(
     total_saved = 0
     results = []
     errors = []
+    codes_list = []  # 收集所有生成的明文激活码
 
     for task in tasks:
         if len(task) < 3:
@@ -93,6 +94,13 @@ def batch_generate_activation_codes(
             })
             total_generated += 1
 
+            # 收集明文激活码用于返回
+            codes_list.append({
+                "code": code,
+                "plan_level": plan_level,
+                "days": days,
+            })
+
             # 每100条批量存储
             if len(codes_to_save) >= 100:
                 manager.save_codes(codes_to_save)
@@ -118,6 +126,7 @@ def batch_generate_activation_codes(
         "total_generated": total_generated,
         "total_saved": total_saved,
         "details": results,
+        "codes": codes_list,
     }
     if errors:
         response["errors"] = errors
