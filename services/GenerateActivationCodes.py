@@ -78,7 +78,7 @@ def batch_generate_activation_codes(
             continue
 
         codes_to_save = []
-        for i in range(count):
+        for _ in range(count):
             code = generate_activation_code(plan_level, days)
 
             # 从 code 中解析出 code_id（用于存储）

@@ -54,26 +54,6 @@ async def register_user(request: RegisterRequest):
     )
 
 
-@app.post("/api/buy-package")
-async def buy_package(request: BuyPackageRequest):
-    """
-    3. 用户购买套餐
-    username: 用户名
-    email: 用户邮箱
-    password: 用户密码
-    plan_level: 套餐等级
-    days: 购买天数
-    """
-    from services.BuyPackageRequest import buy_package
-
-    username = request.username
-    email = request.email
-    password = request.password
-    plan_level = request.plan_level
-    days = request.days
-    return buy_package(username, email, password, plan_level, days)
-
-
 @app.post("/api/random-activation-code")
 async def random_activation_code(request: RandomActivationCodeRequest):
     """
@@ -97,6 +77,27 @@ async def generate_activation_codes(request: GenerateActivationCodesRequest):
     tasks: 格式为 [[plan_level, days, count], ...]
     """
     from services.GenerateActivationCodes import batch_generate_activation_codes
+
+    # 使用提供的管理员凭证登录 NewAPI
+    try:
+        new_api_client.session.headers.pop("New-Api-User", None)
+        new_api_client.session.cookies.clear()
+        username = request.username
+        password = request.password
+        resp = new_api_client.session.post(
+            f"{new_api_client.base_url}/api/user/login",
+            json={"username": username, "password": password},
+        )
+        resp.raise_for_status()
+        data = resp.json()
+        if not data.get("success"):
+            raise HTTPException(status_code=401, detail=data.get("message", "登录失败"))
+        user_data = data.get("data", {})
+        user_id = user_data.get("id")
+        if user_id:
+            new_api_client.session.headers.update({"New-Api-User": str(user_id)})
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=f"管理员认证失败: {e}")
 
     return batch_generate_activation_codes(
         tasks=request.tasks
