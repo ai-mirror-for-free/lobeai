@@ -58,7 +58,6 @@ async def register_user(request: RegisterRequest):
 async def random_activation_code(request: RandomActivationCodeRequest):
     """
     激活码兑换接口
-    验证激活码 → 调用 buy_package 充值 → 删除数据库激活码
     """
     from services.RandomActivationCode import random_activation_code
 
