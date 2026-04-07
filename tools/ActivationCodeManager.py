@@ -26,19 +26,16 @@ logger = LoggerManager(log_file="activation_code.log")
 
 # 通过环境变量注入，防止硬编码泄露
 def _get_secret_key() -> str:
-    """从环境变量获取激活码签名密钥"""
+    """从环境变量获取激活码签名密钥，统一使用 ENCRYPTION_KEY"""
     import os
     from dotenv import load_dotenv
     load_dotenv()
-    key = os.environ.get("ACTIVATION_CODE_SECRET")
+
+    key = os.environ.get("ENCRYPTION_KEY")
+
     if not key:
-        # 生成一个随机密钥，仅首次有效
-        key = secrets.token_hex(32)
-        import warnings
-        warnings.warn(
-            "ACTIVATION_CODE_SECRET 环境变量未设置，激活码安全性降低。"
-            "请在 .env 中设置 ACTIVATION_CODE_SECRET=<64位十六进制密钥>"
-        )
+        raise Exception("未设置 ENCRYPTION_KEY 环境变量，无法生成/验证激活码。")
+
     return key
 
 
