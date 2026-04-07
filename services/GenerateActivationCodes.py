@@ -38,14 +38,6 @@ def batch_generate_activation_codes(
     """
     manager = ActivationCodeManager()
 
-    # 初始化表
-    try:
-        manager.init_table()
-        logger.info("激活码表初始化完成")
-    except Exception as e:
-        logger.error(f"激活码表初始化失败: {e}")
-        return {"status": False, "message": f"表初始化失败: {e}"}
-
     default_count = 10
     total_generated = 0
     total_saved = 0

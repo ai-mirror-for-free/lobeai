@@ -152,24 +152,6 @@ class ActivationCodeManager:
     def __init__(self):
         self.db = NewApiDatabaseManager()
 
-    def init_table(self):
-        """初始化激活码表"""
-        self.db.connect()
-        sql = f"""
-        CREATE TABLE IF NOT EXISTS {self.TABLE_NAME} (
-            id SERIAL PRIMARY KEY,
-            encrypted_code VARCHAR(512) NOT NULL UNIQUE,
-            plan_level VARCHAR(20) NOT NULL,
-            days INTEGER NOT NULL,
-            code_id VARCHAR(64) NOT NULL UNIQUE,
-            created_at TIMESTAMP DEFAULT NOW(),
-            used_at TIMESTAMP,
-            used_by VARCHAR(200)
-        )
-        """
-        self.db.execute_command(sql)
-        self.db.disconnect()
-
     def save_codes(self, codes: List[dict]):
         """
         批量存储激活码（加密后存储）
