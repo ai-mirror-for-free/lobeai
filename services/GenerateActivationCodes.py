@@ -1,15 +1,3 @@
-"""
-批量生成激活码服务
-根据 plan_level × days 组合批量生成激活码并存储到数据库
-
-使用方式:
-    from services.GenerateActivationCodes import batch_generate_activation_codes
-    batch_generate_activation_codes(
-        plan_levels=["default", "vip", "svip"],
-        days_list=[1, 30, 90],
-        counts={"default_1": 10, "default_30": 5, ...}
-    )
-"""
 import json
 import os
 from tools.LoggerManager import LoggerManager

@@ -7,7 +7,8 @@
             "x-ai/grok-4.20",
             "x-ai/grok-4.1-fast",
             "x-ai/grok-4-fast"
-        ]
+        ],
+        "price": 0
     },
     "default": {
         "modele_list": [
@@ -15,7 +16,8 @@
             "gemini-3-flash-preview",
             "x-ai/grok-4.1-fast",
             "x-ai/grok-4-fast"
-        ]
+        ],
+        "price": 1
     },
     "vip": {
         "modele_list": [
@@ -25,7 +27,8 @@
             "x-ai/grok-4.20",
             "x-ai/grok-4.1-fast",
             "x-ai/grok-4-fast"
-        ]
+        ],
+        "price": 2
     },
     "svip": {
         "modele_list": [
@@ -35,6 +38,7 @@
             "x-ai/grok-4.20",
             "x-ai/grok-4.1-fast",
             "x-ai/grok-4-fast"
-        ]
+        ],
+        "price": 4
     }
 }
