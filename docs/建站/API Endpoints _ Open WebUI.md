@@ -83,7 +83,7 @@ Access detailed API documentation for different services provided by Open WebUI:
 
 ### 🔮 Anthropic Messages API[​](#-anthropic-messages-api "Direct link to 🔮 Anthropic Messages API")
 
-Open WebUI provides an Anthropic Messages API compatible endpoint. This allows tools, SDKs, and applications built for the Anthropic API to work directly against Open WebUI — routing requests through all configured models, filters, and pipelines.
+Open WebUI provides an Anthropic Messages API compatible endpoint. This allows tools, SDKs, and applications built for the Anthropic API to work directly against Open WebUI — routing requests through all configured models, apis, and pipelines.
 
 Internally, the endpoint converts the Anthropic request format to OpenAI Chat Completions format, routes it through the existing chat completion pipeline, and converts the response back to Anthropic format. Both streaming and non-streaming requests are supported.
 
@@ -185,15 +185,15 @@ All models configured in Open WebUI are accessible through this endpoint — inc
 
 **Tool Use:** The Anthropic Messages endpoint supports tool use (`tools` and `tool_choice` parameters). Tool calls from the upstream model are translated into Anthropic-format `tool_use` content blocks in both streaming and non-streaming responses.
 
-### 🔧 Filter and Function Behavior with API Requests[​](#-filter-and-function-behavior-with-api-requests "Direct link to 🔧 Filter and Function Behavior with API Requests")
+### 🔧 Filter and Function Behavior with API Requests[​](#-api-and-function-behavior-with-api-requests "Direct link to 🔧 Filter and Function Behavior with API Requests")
 
-When using the API endpoints directly, filters (Functions) behave differently than when requests come from the web interface.
+When using the API endpoints directly, apis (Functions) behave differently than when requests come from the web interface.
 
 Authentication Note
 
 Open WebUI accepts both **API keys** (prefixed with `sk-`) and **JWT tokens** for API authentication. This is intentional—the web interface uses JWT tokens internally for the same API endpoints. Both authentication methods provide equivalent API access.
 
-#### Filter Execution[​](#filter-execution "Direct link to Filter Execution")
+#### Filter Execution[​](#api-execution "Direct link to Filter Execution")
 
 | Filter Function | WebUI Request | Direct API Request |
 | --- | --- | --- |
@@ -213,7 +213,7 @@ The `outlet()` function only runs when the WebUI calls `/api/chat/completed` aft
 
 - **Endpoint**: `POST /api/chat/completed`
     
-- **Description**: Triggers outlet filter processing for a completed chat
+- **Description**: Triggers outlet api processing for a completed chat
     
 - **Curl Example**:
     
@@ -240,7 +240,7 @@ The `outlet()` function only runs when the WebUI calls `/api/chat/completed` aft
     def complete_chat_with_outlet(token, model, messages, chat_id=None):
         """
         Call after receiving the full response from /api/chat/completions
-        to trigger outlet filter processing.
+        to trigger outlet api processing.
         """
         url = 'http://localhost:25142/api/chat/completed'
         headers = {
@@ -261,7 +261,7 @@ The `outlet()` function only runs when the WebUI calls `/api/chat/completed` aft
 
 tip
 
-For more details on writing filters that work with API requests, see the [Filter Function documentation](https://docs.openwebui.com/features/extensibility/plugin/functions/filter#-filter-behavior-with-api-requests).
+For more details on writing apis that work with API requests, see the [Filter Function documentation](https://docs.openwebui.com/features/extensibility/plugin/functions/api#-api-behavior-with-api-requests).
 
 ### 🦙 Ollama API Proxy Support[​](#-ollama-api-proxy-support "Direct link to 🦙 Ollama API Proxy Support")
 

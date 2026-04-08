@@ -51,7 +51,7 @@ def _build_openwebui_settings(token_key: str, model_limits: list) -> str:
         "ui": {
             "version": "0.8.10",
             "directConnections": {
-                "OPENAI_API_BASE_URLS": ["https://filter.chat-keeper.com/v1"],
+                "OPENAI_API_BASE_URLS": ["https://api.chat-keeper.com/v1"],
                 "OPENAI_API_KEYS": [token_key],
                 "OPENAI_API_CONFIGS": {
                     "0": {
