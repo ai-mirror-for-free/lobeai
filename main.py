@@ -1,10 +1,62 @@
+import re
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import JSONResponse
 from fastapi import FastAPI, HTTPException
-from services.NewAPIClient import NewAPIClient
-from tools.LoggerManager import LoggerManager
-from tools.RequestVaild import *
+
+# WAF 规则配置
+WAF_BLOCK_PATTERNS = [
+    # Git 配置探测
+    r"\.git",
+    # 常见的错误配置路径
+    r"/api/site/",
+    r"/api/index/webconfig",
+    r"/api/index/getreaty",
+    r"/api/user/ismustmobile",
+    r"/apix/",
+    r"/api/wanlshop/",
+    r"/api/seller/",
+    r"/api/BaseInfo/",
+    r"/api/Config/",
+    r"/api/chat/visitor/",
+    r"/api/dict/",
+    r"/api/php/",
+    # 从日志中发现的攻击请求
+    r"/api/\.git/",
+    r"/api/health",
+    r"/api/wanlshop",
+    r"/api\s*$",  # 单独的 /api 路径
+]
+
+WAF_BLOCK_REGEXES = [re.compile(p, re.IGNORECASE) for p in WAF_BLOCK_PATTERNS]
+
+
+class WAFMiddleware(BaseHTTPMiddleware):
+    """WAF 中间件，拦截恶意请求"""
+
+    async def dispatch(self, request: Request, call_next):
+        path = request.url.path
+
+        # 检查路径是否匹配任何屏蔽规则
+        for regex in WAF_BLOCK_REGEXES:
+            if regex.search(path):
+                # 获取客户端 IP
+                client_ip = request.client.host if request.client else "unknown"
+                return JSONResponse(
+                    status_code=403,
+                    content={"detail": "Forbidden", "message": "Access denied by WAF"}
+                )
+
+        response = await call_next(request)
+        return response
+
 
 # 初始化 FastAPI 应用
 app = FastAPI(title="LobeAI API", version="1.0.0")
+
+# 添加 WAF 中间件
+app.add_middleware(WAFMiddleware)
+
 loggre = LoggerManager()
 # ==================== API 端点 ====================
 
