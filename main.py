@@ -7,11 +7,8 @@ from services.NewAPIClient import NewAPIClient
 from tools.LoggerManager import LoggerManager
 from tools.RequestVaild import *
 
-# WAF 规则配置
+# WAF 规则配置 - 拦截恶意路径
 WAF_BLOCK_PATTERNS = [
-    # Git 配置探测
-    r"\.git",
-    # 常见的错误配置路径
     r"/api/site/",
     r"/api/index/webconfig",
     r"/api/index/getreaty",
@@ -24,11 +21,6 @@ WAF_BLOCK_PATTERNS = [
     r"/api/chat/visitor/",
     r"/api/dict/",
     r"/api/php/",
-    # 从日志中发现的攻击请求
-    r"/api/\.git/",
-    r"/api/health",
-    r"/api/wanlshop",
-    r"/api\s*$",  # 单独的 /api 路径
 ]
 
 WAF_BLOCK_REGEXES = [re.compile(p, re.IGNORECASE) for p in WAF_BLOCK_PATTERNS]
