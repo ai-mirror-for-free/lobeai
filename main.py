@@ -3,9 +3,6 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from fastapi import FastAPI, HTTPException
-from services.NewAPIClient import NewAPIClient
-from tools.LoggerManager import LoggerManager
-from tools.RequestVaild import *
 
 # WAF 规则配置
 WAF_BLOCK_PATTERNS = [
@@ -43,6 +40,8 @@ class WAFMiddleware(BaseHTTPMiddleware):
         # 检查路径是否匹配任何屏蔽规则
         for regex in WAF_BLOCK_REGEXES:
             if regex.search(path):
+                # 获取客户端 IP
+                client_ip = request.client.host if request.client else "unknown"
                 return JSONResponse(
                     status_code=403,
                     content={"detail": "Forbidden", "message": "Access denied by WAF"}
