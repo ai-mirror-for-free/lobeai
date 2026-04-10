@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenRouter 模型价格查询</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+
+        .search-box {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            margin-bottom: 24px;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 16px 20px;
+            font-size: 1.1rem;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            outline: none;
+            transition: border-color 0.3s, box-shadow 0.3s;
+        }
+
+        .search-box input:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 4px rgba(102, 126, 234, 0.2);
+        }
+
+        .search-box input::placeholder {
+            color: #999;
+        }
+
+        .results {
+            display: grid;
+            gap: 12px;
+        }
+
+        .model-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .model-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+
+        .model-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+
+        .model-name {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #333;
+            word-break: break-all;
+        }
+
+        .model-id {
+            font-size: 0.8rem;
+            color: #888;
+            margin-top: 4px;
+            word-break: break-all;
+        }
+
+        .model-price {
+            text-align: right;
+        }
+
+        .price-label {
+            font-size: 0.75rem;
+            color: #888;
+            margin-bottom: 4px;
+        }
+
+        .price-value {
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .price-free {
+            color: #22c55e;
+        }
+
+        .price-low {
+            color: #3b82f6;
+        }
+
+        .price-medium {
+            color: #f59e0b;
+        }
+
+        .price-high {
+            color: #ef4444;
+        }
+
+        .model-details {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            padding-top: 12px;
+            border-top: 1px solid #f0f0f0;
+        }
+
+        .detail-item {
+            font-size: 0.85rem;
+            color: #666;
+        }
+
+        .detail-item span {
+            font-weight: 500;
+            color: #333;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: white;
+            font-size: 1.2rem;
+        }
+
+        .loading::after {
+            content: '';
+            animation: dots 1.5s infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60%, 100% { content: '...'; }
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 40px;
+            color: white;
+            font-size: 1.2rem;
+        }
+
+        .error {
+            text-align: center;
+            padding: 20px;
+            background: #fee;
+            color: #c00;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+
+        .tips {
+            background: rgba(255,255,255,0.15);
+            border-radius: 12px;
+            padding: 16px;
+            margin-top: 20px;
+            color: white;
+            text-align: center;
+        }
+
+        .tips p {
+            margin: 4px 0;
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>OpenRouter 模型价格查询</h1>
+            <p>输入模型名称查询价格，支持模糊搜索</p>
+        </div>
+
+        <div class="search-box">
+            <input
+                type="text"
+                id="searchInput"
+                placeholder="例如: claude, gpt-4, gemini, deepseek..."
+                autofocus
+            >
+        </div>
+
+        <div id="results" class="results">
+            <div class="loading">正在加载模型列表</div>
+        </div>
+
+        <div class="tips">
+            <p>价格单位: 每 1M tokens 的美元价格</p>
+            <p>支持模型 ID 和模型名称搜索</p>
+        </div>
+    </div>
+
+    <script>
+        const searchInput = document.getElementById('searchInput');
+        const resultsDiv = document.getElementById('results');
+        let modelsCache = null;
+
+        // 获取模型列表
+        async function fetchModels() {
+            if (modelsCache) {
+                return modelsCache;
+            }
+
+            try {
+                const response = await fetch('/api/openrouter/models');
+                if (!response.ok) {
+                    throw new Error('获取模型列表失败');
+                }
+                const data = await response.json();
+                modelsCache = data;
+                return data;
+            } catch (error) {
+                console.error('Error:', error);
+                throw error;
+            }
+        }
+
+        // 搜索模型
+        async function searchModels(query) {
+            try {
+                const models = await fetchModels();
+                return searchModelsClient(models, query);
+            } catch (error) {
+                throw error;
+            }
+        }
+
+        // 客户端搜索
+        function searchModelsClient(models, query) {
+            query = query.toLowerCase().trim();
+
+            let results = models;
+
+            if (query) {
+                results = models.filter(m =>
+                    m.id.toLowerCase().includes(query) ||
+                    m.name.toLowerCase().includes(query)
+                );
+            }
+
+            // 按价格排序
+            results.sort((a, b) => {
+                // 免费优先
+                const aFree = a.prompt_price_raw === 0;
+                const bFree = b.prompt_price_raw === 0;
+                if (aFree && !bFree) return -1;
+                if (!aFree && bFree) return 1;
+
+                // 然后按价格排序
+                return a.prompt_price_raw - b.prompt_price_raw;
+            });
+
+            return results.slice(0, 30);
+        }
+
+        // 获取价格样式
+        function getPriceClass(price) {
+            if (price === 0) return 'price-free';
+            if (price < 0.1) return 'price-low';
+            if (price < 1) return 'price-medium';
+            return 'price-high';
+        }
+
+        // 渲染结果
+        function renderResults(models) {
+            if (models.length === 0) {
+                resultsDiv.innerHTML = '<div class="no-results">未找到匹配的模型</div>';
+                return;
+            }
+
+            resultsDiv.innerHTML = models.map(model => `
+                <div class="model-card">
+                    <div class="model-header">
+                        <div>
+                            <div class="model-name">${escapeHtml(model.name)}</div>
+                            <div class="model-id">${escapeHtml(model.id)}</div>
+                        </div>
+                        <div class="model-price">
+                            <div class="price-label">输入价格</div>
+                            <div class="price-value ${getPriceClass(model.prompt_price_raw)}">
+                                ${escapeHtml(model.prompt_price)}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="model-details">
+                        <div class="detail-item">
+                            输出价格: <span class="${getPriceClass(model.completion_price_raw)}">${escapeHtml(model.completion_price)}</span>
+                        </div>
+                        <div class="detail-item">
+                            上下文: <span>${escapeHtml(model.context_display)}</span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // HTML 转义
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // 防抖
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        // 处理搜索
+        async function handleSearch() {
+            const query = searchInput.value;
+
+            resultsDiv.innerHTML = '<div class="loading">搜索中</div>';
+
+            try {
+                const models = await searchModels(query);
+                renderResults(models);
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="error">加载失败: ${error.message}</div>`;
+            }
+        }
+
+        // 初始化
+        async function init() {
+            try {
+                const models = await fetchModels();
+                const results = searchModelsClient(models, '');
+                renderResults(results);
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="error">加载失败: ${error.message}</div>`;
+            }
+        }
+
+        // 绑定事件
+        searchInput.addEventListener('input', debounce(handleSearch, 300));
+
+        // 启动
+        init();
+    </script>
+</body>
+</html>

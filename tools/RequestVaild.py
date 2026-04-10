@@ -46,3 +46,9 @@ class GenerateActivationCodesRequest(BaseModel):
     username: str  # 管理员用户名
     password: str  # 管理员密码
     tasks: list[list] = []  # 格式: [[plan_level, days, count], ...]
+
+
+class AdminAuthRequest(BaseModel):
+    """管理员认证请求（通用）"""
+    username: str  # 管理员用户名
+    password: str  # 管理员密码

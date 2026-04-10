@@ -1,7 +1,8 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Depends
 from services.NewAPIClient import NewAPIClient
 from tools.LoggerManager import LoggerManager
 from tools.RequestVaild import *
+from tools.VerifyAdmin import get_admin_client
 
 # 初始化 FastAPI 应用
 app = FastAPI(title="LobeAI API", version="1.0.0")
@@ -69,37 +70,73 @@ async def random_activation_code(request: RandomActivationCodeRequest):
     )
 
 
+
+# ==================== 管理员接口 ====================
+
+
 @app.post("/api/admin/generate-activation-codes")
-async def generate_activation_codes(request: GenerateActivationCodesRequest):
+async def generate_activation_codes(
+    request: GenerateActivationCodesRequest,
+    admin_client: NewAPIClient = Depends(get_admin_client)
+):
     """
     【管理员】批量生成激活码接口
     tasks: 格式为 [[plan_level, days, count], ...]
     """
     from services.GenerateActivationCodes import batch_generate_activation_codes
-    # 每次请求创建独立实例，避免污染全局 session
-    admin_client = NewAPIClient()
-    try:
-        admin_client.session.headers.pop("New-Api-User", None)
-        admin_client.session.cookies.clear()
-        resp = admin_client.session.post(
-            f"{admin_client.base_url}/api/user/login",
-            json={"username": request.username, "password": request.password},
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        if not data.get("success"):
-            raise HTTPException(status_code=401, detail=data.get("message", "登录失败"))
-        user_data = data.get("data", {})
-        user_id = user_data.get("id")
-        if user_id:
-            admin_client.session.headers.update({"New-Api-User": str(user_id)})
-    except Exception as e:
-        raise HTTPException(status_code=401, detail=f"管理员认证失败: {e}")
 
     return batch_generate_activation_codes(
         tasks=request.tasks
     )
 
+
+@app.post("/api/admin/openrouter/models")
+async def get_openrouter_models(
+    request: AdminAuthRequest,
+    admin_client: NewAPIClient = Depends(get_admin_client)
+):
+    """
+    【管理员】获取 OpenRouter 所有模型列表（带缓存）
+    """
+    from services.OpenRouterPrice import get_all_models, format_model_info
+
+    models = get_all_models()
+    return [format_model_info(m) for m in models]
+
+
+@app.post("/api/admin/openrouter/search")
+async def search_openrouter_models(
+    request: AdminAuthRequest,
+    admin_client: NewAPIClient = Depends(get_admin_client)
+):
+    """
+    【管理员】搜索 OpenRouter 模型
+
+    Args:
+        q: 搜索关键词
+    """
+    from services.OpenRouterPrice import search_models, format_model_info
+
+    models = search_models(request.q)
+    return [format_model_info(m) for m in models]
+
+
+@app.post("/api/admin/price")
+async def price_query_page(
+    request: AdminAuthRequest,
+    admin_client: NewAPIClient = Depends(get_admin_client)
+):
+    """
+    【管理员】OpenRouter 模型价格查询页面（带管理员认证）
+    """
+    import os
+    from fastapi.responses import FileResponse
+
+    template_path = os.path.join(os.path.dirname(__file__), "templates", "price_query.html")
+    return FileResponse(template_path)
+
+
+# ==================== 额度查询 ====================
 
 @app.post("/api/update-user-quota")
 async def update_user_quota(request: UpdateUserQuotaRequest):
