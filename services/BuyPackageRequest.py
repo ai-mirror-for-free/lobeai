@@ -129,16 +129,6 @@ def buy_package(username: str, email: str, password: str, plan_level: str, days:
             username,
         ),
     )
-    """
-    CREATE TABLE user_recharge (
-    id SERIAL PRIMARY KEY,              -- 自增 ID，主键
-    user_id VARCHAR(50) NOT NULL,       -- 用户标识/ID
-    email VARCHAR(100),                 -- 邮箱
-    recharge_days INTEGER NOT NULL,     -- 充值天数
-    recharge_amount NUMERIC(10, 2),     -- 充值金额 (支持两位小数)
-    recharge_time TIMESTAMP DEFAULT NOW() -- 充值时间 (默认为当前时间)
-);
-    """
 
     # 记录充值信息
     sql = "insert into user_recharge (user_id, email, recharge_days, recharge_amount) values (%s, %s, %s, %s)"

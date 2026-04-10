@@ -205,6 +205,44 @@ class ActivationCodeManager:
         self.db.execute_command(sql, (code_id,))
         self.db.disconnect()
 
+    def get_stats_by_plan(self) -> list[dict]:
+        """
+        按套餐统计激活码信息
+
+        Returns:
+            [
+                {"plan_level": "default", "days": 30, "total": 10, "used": 2, "available": 8},
+                {"plan_level": "vip", "days": 90, "total": 5, "used": 1, "available": 4},
+                ...
+            ]
+        """
+        self.db.connect()
+        sql = f"""
+            SELECT plan_level, days,
+                   COUNT(*) as total,
+                   COUNT(used_at) as used,
+                   COUNT(*) - COUNT(used_at) as available
+            FROM {self.TABLE_NAME}
+            GROUP BY plan_level, days
+            ORDER BY plan_level, days
+        """
+        results = self.db.execute_query(sql)
+        self.db.disconnect()
+
+        if not results:
+            return []
+
+        return [
+            {
+                "plan_level": row[0],
+                "days": row[1],
+                "total": row[2],
+                "used": row[3],
+                "available": row[4],
+            }
+            for row in results
+        ]
+
     def random_code(self, code: str, used_by: str) -> tuple[bool, str, dict]:
         """
         验证激活码（仅验证，不标记已使用）

@@ -40,18 +40,13 @@ async def register_user(request: RegisterRequest):
         注册成功消息和用户信息
     """
     from services.CreaterUsers import main_register_user
-
-    username = request.username
-    password = request.password
-    email = request.email
-    verification_code = request.verification_code
-    aff_code = request.aff_code
+    
     return main_register_user(
-        username=username,
-        password=password,
-        email=email,
-        verification_code=verification_code,
-        aff_code=aff_code,
+        username=request.username,
+        password=request.password,
+        email=request.email,
+        verification_code=request.verification_code,
+        aff_code=request.aff_code,
     )
 
 
@@ -119,6 +114,35 @@ async def search_openrouter_models(
 
     models = search_models(request.q)
     return [format_model_info(m) for m in models]
+
+
+@app.post("/api/admin/activation-codes/stats")
+async def get_activation_codes_stats(
+    request: ActivationCodeStatsRequest,
+    admin_client: NewAPIClient = Depends(get_admin_client)
+):
+    """
+    【管理员】查询激活码统计信息
+    返回每种套餐(plan_level + days)的总数、已使用数量、剩余数量
+    """
+    from tools.ActivationCodeManager import ActivationCodeManager
+
+    manager = ActivationCodeManager()
+    stats = manager.get_stats_by_plan()
+
+    # 计算汇总
+    total_all = sum(s["total"] for s in stats)
+    used_all = sum(s["used"] for s in stats)
+    available_all = sum(s["available"] for s in stats)
+
+    return {
+        "stats": stats,
+        "summary": {
+            "total": total_all,
+            "used": used_all,
+            "available": available_all,
+        }
+    }
 
 
 @app.post("/api/admin/price")

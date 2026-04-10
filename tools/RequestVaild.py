@@ -52,3 +52,9 @@ class AdminAuthRequest(BaseModel):
     """管理员认证请求（通用）"""
     username: str  # 管理员用户名
     password: str  # 管理员密码
+
+
+class ActivationCodeStatsRequest(BaseModel):
+    """激活码统计查询请求"""
+    username: str  # 管理员用户名
+    password: str  # 管理员密码
