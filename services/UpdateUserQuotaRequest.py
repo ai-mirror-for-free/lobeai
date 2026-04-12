@@ -15,6 +15,10 @@ def get_user_info(username, email):
     db.connect()
     sql = "select remain_quota,model_limits,used_quota,expired_time from tokens where name = %s and deleted_at is null"
     user_key_info = db.execute_query(sql, (email,))
+    if not user_key_info:
+        logger.error(f"未找到用户 token 信息: username={username}, email={email}")
+        db.disconnect()
+        return None
     user_key_info = user_key_info[0]
     """
     remain_quota:剩余额度
