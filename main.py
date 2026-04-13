@@ -177,6 +177,27 @@ async def update_user_quota(request: UpdateUserQuotaRequest):
 
     return get_user_info(username=request.username, email=request.email)
 
+# ==================== 可用模型展示 ====================
+@app.get("/api/available-models")
+async def get_available_models():
+    """
+    获取各套餐的可用模型列表
+    """
+    import json
+    import os
+
+    pricing_path = os.path.join(os.path.dirname(__file__), "data", "pricing_plan.json")
+    with open(pricing_path, "r", encoding="utf-8") as f:
+        pricing_plan = json.load(f)
+    pricing_plan.pop("free", None)  # 移除免费套餐
+    return [
+            {
+                "plan": plan_name,
+                "models": plan_data["modele_list"],
+            }
+            for plan_name, plan_data in pricing_plan.items()
+        ]
+
 
 # ==================== 健康检查 ====================
 
