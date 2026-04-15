@@ -189,14 +189,8 @@ async def get_available_models():
     pricing_path = os.path.join(os.path.dirname(__file__), "data", "pricing_plan.json")
     with open(pricing_path, "r", encoding="utf-8") as f:
         pricing_plan = json.load(f)
-    return [
-            {
-                "plan": plan_name,
-                "models": plan_data["modele_list"],
-            }
-            for plan_name, plan_data in pricing_plan.items()
-        ]
-
+    pricing_plan.pop("free", None)
+    return pricing_plan
 
 # ==================== 健康检查 ====================
 
