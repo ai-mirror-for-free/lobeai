@@ -19,7 +19,7 @@ newapidata = NewApiDatabaseManager()
 openwebuidata = OpenWebUIDatabaseManager()
 
 EXCLUDED_NAME = ""
-EXCLUDED_GROUP = "free"
+EXCLUDED_GROUP = ""
 
 
 def _get_all_tokens_from_db():
@@ -102,7 +102,7 @@ def sync_model_limits():
     主同步流程
     """
     # Step 1: 获取最新套餐列表
-    pricing_plan = fill_pricing_plan()
+    pricing_plan = fill_pricing_plan(True)
     logger.info(f"加载定价计划: {list(pricing_plan.keys())}")
 
     # Step 2: 查询所有需要同步的令牌
