@@ -5,6 +5,7 @@ from tools.LoggerManager import LoggerManager
 from func.PricingProcess import fill_pricing_plan
 from tools.GetNewestRate import get_usd_cny_rate
 from tools.DbScript import NewApiDatabaseManager, OpenWebUIDatabaseManager
+from tools.Setting import get_setting
 from services.NewAPIClient import NewAPIClient, TokenConfig
 from services.UpdateUserQuotaRequest import get_user_info
 
@@ -26,7 +27,7 @@ def buy_package(username: str, email: str, password: str, plan_level: str, days:
     7. 记录用户充值
     """
     PRICING_PLAN = fill_pricing_plan()
-    assert days > 0, {"status": False, "message": f" 购买时长不能小于1个月"}
+    assert days > 0, {"status": False, "message": f" 购买时长不能小于1天"}
     assert plan_level in PRICING_PLAN, {"status": False, "message": f"套餐级别错误"}
     # 验证用户登录
     try:
@@ -90,25 +91,7 @@ def buy_package(username: str, email: str, password: str, plan_level: str, days:
         raise RuntimeError("无法获取有效的 token key")
 
     # 生成装配文件
-    setting = {
-        "ui": {
-            "version": "0.8.10",
-            "directConnections": {
-                "OPENAI_API_BASE_URLS": ["https://api.chat-keeper.com/v1"],
-                "OPENAI_API_KEYS": [token_key],
-                "OPENAI_API_CONFIGS": {
-                    "0": {
-                        "enable": True,
-                        "tags": [],
-                        "prefix_id": "  ",
-                        "model_ids": model_limits,
-                        "connection_type": "external",
-                        "auth_type": "bearer",
-                    }
-                },
-            },
-        }
-    }
+    setting = get_setting(token_key, model_limits)
     # 更新 openwebui 用户设置
     setting = json.dumps(setting)
     update_settings = 'update "user" set settings = %s where email = %s'

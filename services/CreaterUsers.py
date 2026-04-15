@@ -13,6 +13,7 @@ import time
 from datetime import datetime
 from tools.GetNewestRate import get_usd_cny_rate
 from tools.LoggerManager import LoggerManager
+from tools.Setting import get_setting
 from func.PricingProcess import fill_pricing_plan
 from tools.DbScript import NewApiDatabaseManager, OpenWebUIDatabaseManager
 from services.OpenWebuiRegisterUsers import register_user
@@ -71,25 +72,7 @@ def main_register_user(
         raise RuntimeError("无法获取有效的 token key")
 
     # 生成装配文件
-    setting = {
-        "ui": {
-            "version": "0.8.10",
-            "directConnections": {
-                "OPENAI_API_BASE_URLS": ["https://api.chat-keeper.com/v1"],
-                "OPENAI_API_KEYS": [token_key],
-                "OPENAI_API_CONFIGS": {
-                    "0": {
-                        "enable": True,
-                        "tags": [],
-                        "prefix_id": "  ",
-                        "model_ids": model_limits,
-                        "connection_type": "external",
-                        "auth_type": "bearer",
-                    }
-                },
-            },
-        }
-    }
+    setting = get_setting(token_key, model_limits)
     # 查询 pg 库
     setting = json.dumps(setting)
     update_settings = 'update "user" set settings = %s where email = %s'

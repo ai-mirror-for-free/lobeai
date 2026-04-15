@@ -12,12 +12,13 @@ import json
 from tools.DbScript import NewApiDatabaseManager, OpenWebUIDatabaseManager
 from tools.LoggerManager import LoggerManager
 from func.PricingProcess import fill_pricing_plan
+from tools.Setting import get_setting
 
 logger = LoggerManager(log_file="sync_model_limits.log")
 newapidata = NewApiDatabaseManager()
 openwebuidata = OpenWebUIDatabaseManager()
 
-EXCLUDED_NAME = "local"
+EXCLUDED_NAME = ""
 EXCLUDED_GROUP = "free"
 
 
@@ -47,25 +48,7 @@ def _build_openwebui_settings(token_key: str, model_limits: list) -> str:
     构建 OpenWebUI settings JSON 字符串
     参考 CreaterUsers.py 的 settings 格式
     """
-    setting = {
-        "ui": {
-            "version": "0.8.10",
-            "directConnections": {
-                "OPENAI_API_BASE_URLS": ["https://api.chat-keeper.com/v1"],
-                "OPENAI_API_KEYS": [token_key],
-                "OPENAI_API_CONFIGS": {
-                    "0": {
-                        "enable": True,
-                        "tags": [],
-                        "prefix_id": "  ",
-                        "model_ids": model_limits,
-                        "connection_type": "external",
-                        "auth_type": "bearer",
-                    }
-                },
-            },
-        }
-    }
+    setting = get_setting(token_key, model_limits)
     return json.dumps(setting)
 
 
