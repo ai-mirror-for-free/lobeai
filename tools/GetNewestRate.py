@@ -30,6 +30,9 @@ def get_usd_cny_rate():
 
 
 def _read_saved_rate():
+    if not os.path.exists(RATE_FILE):
+        with open(RATE_FILE, "w") as f:
+            json.dump({"rate": 6.8}, f)
     """读取保存的汇率文件"""
     with open(RATE_FILE, "r") as f:
         saved = json.load(f)
@@ -39,4 +42,4 @@ def _read_saved_rate():
 
 
 if __name__ == "__main__":
-    print(_read_saved_rate())
+    print(get_usd_cny_rate())
