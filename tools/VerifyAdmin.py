@@ -2,7 +2,9 @@ from services.NewAPIClient import NewAPIClient
 from fastapi import HTTPException, Depends
 from tools.RequestVaild import AdminAuthRequest
 
-# ==================== 管理员认证依赖函数 ====================
+# NewAPI 管理员 role 值
+ADMIN_ROLE = 100
+
 
 async def get_admin_client(request: AdminAuthRequest) -> NewAPIClient:
     """
@@ -21,7 +23,7 @@ async def get_admin_client(request: AdminAuthRequest) -> NewAPIClient:
         已登录的 NewAPIClient 实例
 
     Raises:
-        HTTPException: 认证失败时抛出
+        HTTPException: 非管理员用户或认证失败时抛出
     """
     admin_client = NewAPIClient()
     try:
@@ -37,6 +39,15 @@ async def get_admin_client(request: AdminAuthRequest) -> NewAPIClient:
             raise HTTPException(status_code=401, detail=data.get("message", "登录失败"))
         user_data = data.get("data", {})
         user_id = user_data.get("id")
+        user_role = user_data.get("role")
+
+        # 验证是否为管理员
+        if user_role != ADMIN_ROLE:
+            raise HTTPException(
+                status_code=403,
+                detail=f"权限不足：需要管理员权限（role={ADMIN_ROLE}），当前用户 role={user_role}"
+            )
+
         if user_id:
             admin_client.session.headers.update({"New-Api-User": str(user_id)})
         return admin_client

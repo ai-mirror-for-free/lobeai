@@ -1,0 +1,108 @@
+# NewAPI
+
+## Docs
+- 根目录 [文档说明](https://apifox.newapi.ai/7895808m0.md): 
+- 根目录 [鉴权方式说明](https://apifox.newapi.ai/7764357m0.md): 
+
+## API Docs
+- 根目录 > 模型（Models） > 列出模型 [原生OpenAI格式](https://apifox.newapi.ai/383826468e0.md): 获取当前可用的模型列表。
+- 根目录 > 模型（Models） > 列出模型 [原生Gemini格式](https://apifox.newapi.ai/383826471e0.md): 以 Gemini API 格式返回可用模型列表
+- 根目录 > 聊天（Chat） > 原生OpenAI格式 [ChatCompletions格式](https://apifox.newapi.ai/383826473e0.md): 根据对话历史创建模型响应。支持流式和非流式响应。
+- 根目录 > 聊天（Chat） > 原生OpenAI格式 [Responses格式](https://apifox.newapi.ai/383826475e0.md): OpenAI Responses API，用于创建模型响应。
+- 根目录 > 聊天（Chat） > 原生Gemini格式 [Gemini文本聊天](https://apifox.newapi.ai/383826489e0.md): 代理 Gemini API 请求。
+- 根目录 > 聊天（Chat） > 原生Gemini格式 [Gemini媒体识别](https://apifox.newapi.ai/391536411e0.md): Gemini图像、PDF、音频、视频识别请求
+- 根目录 > 聊天（Chat） [原生Claude格式](https://apifox.newapi.ai/383826476e0.md): Anthropic Claude Messages API 格式的请求。
+- 根目录 > 补全（Completions） [原生OpenAI格式](https://apifox.newapi.ai/383826474e0.md): 基于给定提示创建文本补全
+- 根目录 > 图像（Images） > 原生OpenAI格式 [生成图像](https://apifox.newapi.ai/385320132e0.md): 在给定提示的情况下创建图像。[了解更多](https://platform.openai.com/docs/guides/images)。
+- 根目录 > 图像（Images） > 原生OpenAI格式 [编辑图像](https://apifox.newapi.ai/385320133e0.md): 在给定原始图像和提示的情况下创建编辑或扩展图像。
+- 根目录 > 图像（Images） > 通义千问格式 [生成图像](https://apifox.newapi.ai/383833512e0.md):  百炼qwen-image系列图片生成
+- 根目录 > 图像（Images） > 通义千问格式 [编辑图像](https://apifox.newapi.ai/383834049e0.md):  百炼qwen-image系列图片编辑
+- 根目录 > 图像（Images） > Nano Banana [Gemini原生格式](https://apifox.newapi.ai/383837589e0.md): Gemini 图片生成
+- 根目录 > 图像（Images） > Nano Banana [OpenAI聊天格式](https://apifox.newapi.ai/389846313e0.md): Gemini 图片生成
+- 根目录 > 视频（Videos） > Sora格式 [创建视频 ](https://apifox.newapi.ai/383844578e0.md): OpenAI 兼容的视频生成接口。
+- 根目录 > 视频（Videos） > Sora格式 [获取视频任务状态 ](https://apifox.newapi.ai/383844579e0.md): OpenAI 兼容的视频任务状态查询接口。
+- 根目录 > 视频（Videos） > Sora格式 [获取视频内容](https://apifox.newapi.ai/383844580e0.md): 获取已完成视频任务的视频文件内容。
+- 根目录 > 视频（Videos） > 可灵格式 [Kling 文生视频](https://apifox.newapi.ai/383844639e0.md): 使用 Kling 模型从文本描述生成视频。
+- 根目录 > 视频（Videos） > 可灵格式 [获取 Kling 文生视频任务状态](https://apifox.newapi.ai/383844640e0.md): 查询 Kling 文生视频任务的状态和结果。
+- 根目录 > 视频（Videos） > 可灵格式 [Kling 图生视频](https://apifox.newapi.ai/383844641e0.md): 使用 Kling 模型从图片生成视频。
+- 根目录 > 视频（Videos） > 可灵格式 [获取 Kling 图生视频任务状态](https://apifox.newapi.ai/383844642e0.md): 查询 Kling 图生视频任务的状态和结果。
+- 根目录 > 视频（Videos） > 即梦格式 [即梦视频生成](https://apifox.newapi.ai/383844643e0.md): 即梦官方 API 格式的视频生成接口。
+- 根目录 > 视频（Videos） [创建视频生成任务](https://apifox.newapi.ai/383844576e0.md): 提交视频生成任务，支持文生视频和图生视频。
+- 根目录 > 视频（Videos） [获取视频生成任务状态](https://apifox.newapi.ai/383844577e0.md): 查询视频生成任务的状态和结果。
+- 根目录 > 音频（Audio） > 原生OpenAI格式 [音频转录](https://apifox.newapi.ai/383826483e0.md): 将音频转换为文本
+- 根目录 > 音频（Audio） > 原生OpenAI格式 [音频翻译](https://apifox.newapi.ai/383826484e0.md): 将音频翻译为英文文本
+- 根目录 > 音频（Audio） > 原生OpenAI格式 [文本转语音](https://apifox.newapi.ai/383826485e0.md): 将文本转换为音频
+- 根目录 > 音频（Audio） [原生Gemini格式](https://apifox.newapi.ai/383836364e0.md): Gemini 音频生成接口。
+- 根目录 > 实时语音（Realtime） [原生OpenAI格式](https://apifox.newapi.ai/383826490e0.md): 建立 WebSocket 连接用于实时对话。
+- 根目录 > 嵌入（Embeddings） [原生OpenAI格式](https://apifox.newapi.ai/383826477e0.md): 将文本转换为向量嵌入
+- 根目录 > 嵌入（Embeddings） [原生Gemini格式](https://apifox.newapi.ai/383826478e0.md): 使用指定引擎/模型创建嵌入
+- 根目录 > 重排序（Rerank） [文档重排序](https://apifox.newapi.ai/383826486e0.md): 根据查询对文档列表进行相关性重排序
+- 根目录 > 审查（Moderations） [原生OpenAI格式](https://apifox.newapi.ai/383826487e0.md): 检查文本内容是否违反使用政策
+- 根目录 > 未实现（Unimplemented） > 微调（Fine-tuning） [列出微调任务 (未实现)](https://apifox.newapi.ai/383826496e0.md): 此接口尚未实现
+- 根目录 > 未实现（Unimplemented） > 微调（Fine-tuning） [创建微调任务 (未实现)](https://apifox.newapi.ai/383826497e0.md): 此接口尚未实现
+- 根目录 > 未实现（Unimplemented） > 微调（Fine-tuning） [获取微调任务详情 (未实现)](https://apifox.newapi.ai/383826498e0.md): 此接口尚未实现
+- 根目录 > 未实现（Unimplemented） > 微调（Fine-tuning） [取消微调任务 (未实现)](https://apifox.newapi.ai/383826499e0.md): 此接口尚未实现
+- 根目录 > 未实现（Unimplemented） > 微调（Fine-tuning） [获取微调任务事件 (未实现)](https://apifox.newapi.ai/383826500e0.md): 此接口尚未实现
+- 根目录 > 未实现（Unimplemented） > 文件（Files） [列出文件 (未实现)](https://apifox.newapi.ai/383826491e0.md): 此接口尚未实现
+- 根目录 > 未实现（Unimplemented） > 文件（Files） [上传文件 (未实现)](https://apifox.newapi.ai/383826492e0.md): 此接口尚未实现
+- 根目录 > 未实现（Unimplemented） > 文件（Files） [获取文件信息 (未实现)](https://apifox.newapi.ai/383826493e0.md): 此接口尚未实现
+- 根目录 > 未实现（Unimplemented） > 文件（Files） [删除文件 (未实现)](https://apifox.newapi.ai/383826494e0.md): 此接口尚未实现
+- 根目录 > 未实现（Unimplemented） > 文件（Files） [获取文件内容 (未实现)](https://apifox.newapi.ai/383826495e0.md): 此接口尚未实现
+- 根目录 > 系统 [获取初始化状态](https://apifox.newapi.ai/384083811e0.md): 🔓 无需鉴权
+- 根目录 > 系统 [初始化系统](https://apifox.newapi.ai/384083812e0.md): 🔓 无需鉴权
+- 根目录 > 系统 [获取系统状态](https://apifox.newapi.ai/384083813e0.md): 🔓 无需鉴权
+- 根目录 > 系统 [测试系统状态](https://apifox.newapi.ai/384083814e0.md): 👨‍💼 需要管理员权限（Admin）
+- 根目录 > 系统 [获取Uptime Kuma状态](https://apifox.newapi.ai/384083815e0.md): 🔓 无需鉴权
+- 根目录 > 系统 [获取公告](https://apifox.newapi.ai/384083816e0.md): 🔓 无需鉴权
+- 根目录 > 系统 [获取用户协议](https://apifox.newapi.ai/384083817e0.md): 🔓 无需鉴权
+- 根目录 > 系统 [获取隐私政策](https://apifox.newapi.ai/384083818e0.md): 🔓 无需鉴权
+- 根目录 > 系统 [获取关于信息](https://apifox.newapi.ai/384083819e0.md): 🔓 无需鉴权
+- 根目录 > 系统 [获取首页内容](https://apifox.newapi.ai/384083820e0.md): 🔓 无需鉴权
+- 根目录 > 系统 [获取定价信息](https://apifox.newapi.ai/384083821e0.md): 🔓 无需鉴权（可选登录）
+- 根目录 > 系统 [获取模型列表](https://apifox.newapi.ai/384083822e0.md): 🔐 需要登录（User权限）
+- 根目录 > 系统 [获取倍率配置](https://apifox.newapi.ai/384083823e0.md): 🔓 无需鉴权
+- 根目录 > 用户登陆注册 [发送邮箱验证码](https://apifox.newapi.ai/384083824e0.md): 🔓 无需鉴权
+- 根目录 > 用户登陆注册 [发送密码重置邮件](https://apifox.newapi.ai/384083825e0.md): 🔓 无需鉴权
+- 根目录 > 用户登陆注册 [重置密码](https://apifox.newapi.ai/384083826e0.md): 🔓 无需鉴权
+- 根目录 > 用户登陆注册 [用户注册](https://apifox.newapi.ai/384083827e0.md): 🔓 无需鉴权
+- 根目录 > 用户登陆注册 [用户登录](https://apifox.newapi.ai/384083828e0.md): 🔓 无需鉴权
+- 根目录 > 用户登陆注册 [两步验证登录](https://apifox.newapi.ai/384083829e0.md): 🔓 无需鉴权（登录流程）
+- 根目录 > 用户登陆注册 [用户登出](https://apifox.newapi.ai/384083830e0.md): 🔓 无需鉴权
+- 根目录 > 用户登陆注册 [获取用户分组列表](https://apifox.newapi.ai/384083831e0.md): 🔓 无需鉴权
+- 根目录 > 用户登陆注册 [开始Passkey登录](https://apifox.newapi.ai/384083832e0.md): 🔓 无需鉴权
+- 根目录 > 用户登陆注册 [完成Passkey登录](https://apifox.newapi.ai/384083833e0.md): 🔓 无需鉴权
+- 根目录 > OAuth [GitHub OAuth登录](https://apifox.newapi.ai/384083834e0.md): 🔓 无需鉴权（OAuth回调）
+- 根目录 > OAuth [Discord OAuth登录](https://apifox.newapi.ai/384083835e0.md): 🔓 无需鉴权（OAuth回调）
+- 根目录 > OAuth [OIDC登录](https://apifox.newapi.ai/384083836e0.md): 🔓 无需鉴权（OAuth回调）
+- 根目录 > OAuth [LinuxDO OAuth登录](https://apifox.newapi.ai/384083837e0.md): 🔓 无需鉴权（OAuth回调）
+- 根目录 > OAuth [生成OAuth State](https://apifox.newapi.ai/384083838e0.md): 🔓 无需鉴权
+- 根目录 > OAuth [微信OAuth登录](https://apifox.newapi.ai/384083839e0.md): 🔓 无需鉴权（OAuth回调）
+- 根目录 > OAuth [绑定微信](https://apifox.newapi.ai/384083840e0.md): 🔓 无需鉴权
+- 根目录 > OAuth [绑定邮箱](https://apifox.newapi.ai/384083841e0.md): 🔓 无需鉴权
+- 根目录 > OAuth [Telegram登录](https://apifox.newapi.ai/384083842e0.md): 🔓 无需鉴权（OAuth回调）
+- 根目录 > OAuth [绑定Telegram](https://apifox.newapi.ai/384083843e0.md): 🔓 无需鉴权
+- 根目录 > 用户管理 [获取当前用户分组](https://apifox.newapi.ai/384083844e0.md): 🔐 需要登录（User权限）
+- 根目录 > 用户管理 [获取当前用户信息](https://apifox.newapi.ai/384083845e0.md): 🔐 需要登录（User权限）
+- 根目录 > 用户管理 [更新当前用户信息](https://apifox.newapi.ai/384083846e0.md): 🔐 需要登录（User权限）
+- 根目录 > 用户管理 [注销当前用户](https://apifox.newapi.ai/384083847e0.md): 🔐 需要登录（User权限）
+- 根目录 > 用户管理 [获取用户可用模型](https://apifox.newapi.ai/384083848e0.md): 🔐 需要登录（User权限）
+- 根目录 > 用户管理 [生成访问令牌](https://apifox.newapi.ai/384083849e0.md): 🔐 需要登录（User权限）
+- 根目录 > 用户管理 [获取Passkey状态](https://apifox.newapi.ai/384083850e0.md): 🔐 需要登录（User权限）
+- 根目录 > 用户管理 [删除Passkey](https://apifox.newapi.ai/384083851e0.md): 🔐 需要登录（User权限）
+- 根目录 > 用户管理 [开始注册Passkey](https://apifox.newapi.ai/384083852e0.md): 🔐 需要登录（User权限）
+- 根目录 > 用户管理 [完成注册Passkey](https://apifox.newapi.ai/384083853e0.md): 🔐 需要登录（User权限）
+- 根目录 > 用户管理 [开始验证Passkey](https://apifox.newapi.ai/384083854e0.md): 🔐 需要登录（User权限）
+- 根目录 > 用户管理 [完成验证Passkey](https://apifox.newapi.ai/384083855e0.md): 🔐 需要登录（User权限）
+- 根目录 > 用户管理 [获取邀请码](https://apifox.newapi.ai/384083856e0.md): 🔐 需要登录（User权限）
+- 根目录 > 用户管理 [转换邀请额度](https://apifox.newapi.ai/384083857e0.md): 🔐 需要登录（User权限）
+- 根目录 > 用户管理 [更新用户设置](https://apifox.newapi.ai/384083858e0.md): 🔐 需要登录（User权限）
+- 根目录 > 用户管理 [获取所有充值记录](https://apifox.newapi.ai/384083859e0.md): 👨‍💼 需要管理员权限（Admin）
+- 根目录 > 用户管理 [获取所有用户](https://apifox.newapi.ai/384083860e0.md): 👨‍💼 需要管理员权限（Admin）
+- 根目录 > 用户管理 [创建用户](https://apifox.newapi.ai/384083861e0.md): 👨‍💼 需要管理员权限（Admin）
+- 根目录 > 用户管理 [更新用户](https://apifox.newapi.ai/384083862e0.md): 👨‍💼 需要管理员权限（Admin）
+- 根目录 > 用户管理 [管理员完成充值](https://apifox.newapi.ai/384083863e0.md): 👨‍💼 需要管理员权限（Admin）
+- 根目录 > 用户管理 [搜索用户](https://apifox.newapi.ai/384083864e0.md): 👨‍💼 需要管理员权限（Admin）
+- 根目录 > 用户管理 [获取指定用户](https://apifox.newapi.ai/384083865e0.md): 👨‍💼 需要管理员权限（Admin）
+- 根目录 > 用户管理 [删除用户](https://apifox.newapi.ai/384083866e0.md): 👨‍💼 需要管理员权限（Admin）
+- 根目录 > 用户管理 [管理员重置用户Passkey](https://apifox.newapi.ai/384083867e0.md): 👨‍💼 需要管理员权限（Admin）
+- 根目录 > 用户管理 [管理员禁用用户2FA](https://apifox.newapi.ai/384083868e0.md): 
