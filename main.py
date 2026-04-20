@@ -1,12 +1,28 @@
 from fastapi import FastAPI, Depends
+from fastapi.middleware.cors import CORSMiddleware
 from services.NewAPIClient import NewAPIClient
 from tools.LoggerManager import LoggerManager
 from tools.RequestVaild import *
 from tools.VerifyAdmin import get_admin_client
+from middleware.ProtectionMiddleware import ProtectionMiddleware
 
 # 初始化 FastAPI 应用
 app = FastAPI(title="LobeAI API", version="1.0.0")
 loggre = LoggerManager()
+
+# ==================== 中间件 ====================
+
+# 防护中间件（拦截扫描器）
+app.add_middleware(ProtectionMiddleware)
+
+# CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 # ==================== API 端点 ====================
 
 
