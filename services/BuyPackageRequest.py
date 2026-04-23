@@ -27,7 +27,7 @@ def buy_package(username: str, email: str, password: str, plan_level: str, days:
     7. 记录用户充值
     """
     PRICING_PLAN = fill_pricing_plan()
-    assert days > 0, {"status": False, "message": f" 购买时长不能小于1天"}
+    assert days in [1, 30, 120], {"status": False, "message": f"购买天数错误"}
     assert plan_level in PRICING_PLAN, {"status": False, "message": f"套餐级别错误"}
     # 验证用户登录
     try:

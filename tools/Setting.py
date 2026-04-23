@@ -1,7 +1,7 @@
 def get_setting(token_key, model_limits):
     setting = {
         "ui": {
-            "version": "0.8.12",
+            "version": "0.9.1",
             "directConnections": {
                 "OPENAI_API_BASE_URLS": ["https://api.chat-keeper.com/v1"],
                 "OPENAI_API_KEYS": [token_key],

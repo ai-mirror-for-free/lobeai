@@ -58,3 +58,10 @@ class ActivationCodeStatsRequest(BaseModel):
     """激活码统计查询请求"""
     username: str  # 管理员用户名
     password: str  # 管理员密码
+
+
+class AdminOpenRouterSearchRequest(BaseModel):
+    """管理员搜索 OpenRouter 模型请求"""
+    username: str  # 管理员用户名
+    password: str  # 管理员密码
+    model_name: str  # 搜索的模型名称

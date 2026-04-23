@@ -117,18 +117,18 @@ async def get_openrouter_models(
 
 @app.post("/api/admin/openrouter/search")
 async def search_openrouter_models(
-    request: AdminAuthRequest,
+    request: AdminOpenRouterSearchRequest,
     admin_client: NewAPIClient = Depends(get_admin_client)
 ):
     """
     【管理员】搜索 OpenRouter 模型
 
     Args:
-        q: 搜索关键词
+        model_name: 搜索的模型名称
     """
     from services.OpenRouterPrice import search_models, format_model_info
 
-    models = search_models(request.q)
+    models = search_models(request.model_name)
     return [format_model_info(m) for m in models]
 
 
