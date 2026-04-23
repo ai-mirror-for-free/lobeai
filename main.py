@@ -128,7 +128,7 @@ async def search_openrouter_models(
     """
     from services.OpenRouterPrice import search_models, format_model_info
 
-    models = search_models(request.model_name)
+    models = search_models(request.q)
     return [format_model_info(m) for m in models]
 
 
