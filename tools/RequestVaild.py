@@ -65,3 +65,11 @@ class AdminOpenRouterSearchRequest(BaseModel):
     username: str  # 管理员用户名
     password: str  # 管理员密码
     q: str  # 搜索的模型名称
+
+
+class AdminTextUpdateRequest(BaseModel):
+    """管理员更新文本请求"""
+    username: str  # 管理员用户名
+    password: str  # 管理员密码
+    key: str  # 文本的 key
+    content: str  # 文本内容

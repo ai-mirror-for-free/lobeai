@@ -4,6 +4,7 @@ from services.NewAPIClient import NewAPIClient
 from tools.LoggerManager import LoggerManager
 from tools.RequestVaild import *
 from tools.VerifyAdmin import get_admin_client
+from tools.RequestVaild import AdminTextUpdateRequest
 from middleware.ProtectionMiddleware import ProtectionMiddleware
 
 # 初始化 FastAPI 应用
@@ -174,6 +175,46 @@ async def price_query_page(
 
     template_path = os.path.join(os.path.dirname(__file__), "templates", "price_query.html")
     return FileResponse(template_path)
+
+
+@app.post("/api/admin/text")
+async def update_text(
+    request: AdminTextUpdateRequest,
+    admin_client: NewAPIClient = Depends(get_admin_client)
+):
+    """
+    【管理员】更新文本并保存到 data 目录
+    """
+    import json
+    import os
+
+    data_dir = os.path.join(os.path.dirname(__file__), "data", "text")
+    os.makedirs(data_dir, exist_ok=True)
+    file_path = os.path.join(data_dir, f"{request.key}.json")
+
+    with open(file_path, "w", encoding="utf-8") as f:
+        json.dump({"key": request.key, "content": request.content}, f, ensure_ascii=False, indent=2)
+
+    loggre.info(f"文本已更新: {request.key}")
+    return {"message": "文本已更新", "key": request.key}
+
+
+@app.get("/api/text/{key}")
+async def get_text(key: str):
+    """
+    获取文本内容（无需认证）
+    """
+    import json
+    import os
+
+    file_path = os.path.join(os.path.dirname(__file__), "data", "text", f"{key}.json")
+    if not os.path.exists(file_path):
+        return {"message": "文本不存在", "key": key}
+
+    with open(file_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    return data
 
 
 # ==================== 额度查询 ====================
