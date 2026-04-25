@@ -45,9 +45,11 @@ def buy_package(username: str, email: str, password: str, plan_level: str, days:
     # 获取用户套餐级别
     new_api_db.connect()
     sql = "select plan_level, token, days_left from users_center where email = %s and name = %s"
-    plan_level_old, token_old, expired_time = new_api_db.execute_query(
-        sql, (email, username)
-    )[0]
+    result = new_api_db.execute_query(sql, (email, username))
+    if not result:
+        logger.error(f"未找到用户: email={email}, name={username}")
+        return {"status": False, "message": "用户不存在"}
+    plan_level_old, token_old, expired_time = result[0]
     if plan_level_old == "free":
         logger.info("用户是免费用户")
         remain_quota = 0
