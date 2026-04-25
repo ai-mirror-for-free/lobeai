@@ -5,6 +5,7 @@ gemini-3-flash-preview,1,1,1,1
 x-ai/grok-4.20,0,0,1,1
 x-ai/grok-4.1-fast,1,1,1,1
 x-ai/grok-4-fast,1,1,1,1
+openai/gpt-5.5,0,0,0,1
 openai/gpt-5.4,0,0,1,1
 openai/gpt-5.4-mini,0,1,1,1
 openai/gpt-5.4-nano,1,1,1,1
