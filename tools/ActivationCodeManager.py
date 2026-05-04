@@ -120,7 +120,7 @@ def parse_activation_code(code: str) -> Optional[dict]:
         return None
 
 
-def validate_activation_code_integrity(code: str, max_age_seconds: int = 7 * 86400) -> tuple[bool, str]:
+def validate_activation_code_integrity(code: str) -> tuple[bool, str]:
     """
     验证激活码的完整性和新鲜度（不查数据库）
 
@@ -134,9 +134,6 @@ def validate_activation_code_integrity(code: str, max_age_seconds: int = 7 * 864
     if not parsed:
         return False, "激活码格式错误或签名无效"
 
-    age = int(time.time()) - parsed["timestamp"]
-    if age > max_age_seconds:
-        return False, "激活码已过期"
 
     return True, ""
 
