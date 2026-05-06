@@ -6,9 +6,9 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 # ==================== 防护配置 ====================
 
-NOTFOUND_LIMIT = 3          # 短时间内 404 次数阈值
-NOTFOUND_WINDOW = 60         # 时间窗口(秒)
-NOTFOUND_BLOCK_SECONDS = 300 # 触发后封禁时长(秒)
+NOTFOUND_LIMIT = 1           # 短时间内 404 次数阈值
+NOTFOUND_WINDOW = 600         # 时间窗口(秒)
+NOTFOUND_BLOCK_SECONDS = 3600 # 触发后封禁时长(秒)
 
 # 排除不记入 404 计数的正常路径(白名单)
 EXCLUDE_PATHS = [
