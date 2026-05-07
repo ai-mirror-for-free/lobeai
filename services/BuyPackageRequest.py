@@ -64,7 +64,7 @@ def buy_package(username: str, email: str, password: str, plan_level: str, days:
     if days >= 30:
         remain_quota += plan_info["price"] * days / rate * 500000
     else:
-        remain_quota += plan_info["price"] * days / rate * 500000 * 0.8
+        remain_quota += plan_info["price"] * days / rate * 500000 * 0.95
     remain_quota = int(remain_quota)
     model_limits = plan_info["modele_list"]
     expired_time = max(expired_time, int(time.time()))
