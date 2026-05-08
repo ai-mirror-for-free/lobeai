@@ -39,7 +39,7 @@ class ProtectionMiddleware(BaseHTTPMiddleware):
             if time.time() - ip_blocked[ip] < NOTFOUND_BLOCK_SECONDS:
                 return JSONResponse(
                     status_code=429,
-                    content={"detail": "Too many requests, please try later."},
+                    content={"detail": "fuck your mother"},
                 )
             else:
                 del ip_blocked[ip]
@@ -62,7 +62,7 @@ class ProtectionMiddleware(BaseHTTPMiddleware):
                 print(f"[BLOCKED] ip={ip} 404_count={NOTFOUND_LIMIT} in {NOTFOUND_WINDOW}s")
                 return JSONResponse(
                     status_code=429,
-                    content={"detail": "Too many requests, please try later."},
+                    content={"detail": "fuck your mother"},
                 )
 
         return response

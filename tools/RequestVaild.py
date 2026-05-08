@@ -67,6 +67,12 @@ class AdminOpenRouterSearchRequest(BaseModel):
     q: str  # 搜索的模型名称
 
 
+class ResetPasswordRequest(BaseModel):
+    """重置密码请求（忘记密码后删除账号）"""
+    username: str
+    email: EmailStr
+
+
 class AdminTextUpdateRequest(BaseModel):
     """管理员更新文本请求"""
     username: str  # 管理员用户名

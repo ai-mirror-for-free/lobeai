@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from services.NewAPIClient import NewAPIClient
 from tools.LoggerManager import LoggerManager
@@ -25,6 +25,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 # ==================== API 端点 ====================
+
+
+@app.post("/api/reset-password")
+async def reset_password(request: ResetPasswordRequest, req: Request):
+    """
+    忘记密码后重置账号
+
+    校验用户名+邮箱后，从 NewAPI 和 OpenWebUI 数据库中删除用户。
+    IP 限流：每小时 3 次失败尝试，超限封禁 1 天。
+    """
+    from services.ResetPassword import reset_password as do_reset
+
+    return do_reset(request.username, request.email, req)
 
 
 @app.post("/api/send-verification-code")

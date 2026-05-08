@@ -42,12 +42,44 @@ def main_register_user(
     # open webui 注册
     register_user(username, email, password)
 
-    # 管理员登录（使用环境变量中的管理员账户）
-    newapiclient.login()
     PRICING_PLAN = fill_pricing_plan()
     model_limits = PRICING_PLAN["free"]["modele_list"]
+
+    # 检查是否为忘记密码恢复（users_center 中是否已有该邮箱记录）
+    newapidata.connect()
+    existing = newapidata.execute_query(
+        "SELECT token, plan_level FROM users_center WHERE email = %s", (email,)
+    )
+    newapidata.disconnect()
+
+    if existing:
+        # 忘记密码恢复：复用已有令牌和套餐级别，只更新 OpenWebUI settings
+        token_key, plan_level = existing[0]
+        model_limits = PRICING_PLAN[plan_level]["modele_list"]
+        logger.info(f"用户 {username} 为忘记密码恢复，复用已有令牌，套餐: {plan_level}")
+
+        setting = get_setting(token_key, model_limits)
+        setting = json.dumps(setting)
+        openwebuidata.connect()
+        openwebuidata.execute_command(
+            'UPDATE "user" SET settings = %s WHERE email = %s', (setting, email)
+        )
+        openwebuidata.disconnect()
+
+        logger.info(f"用户 {username} 密码恢复完成")
+        return {
+            "success": True,
+            "message": "密码已恢复，欢迎回来",
+            "data": {
+                "username": username,
+                "password": password,
+                "email": email,
+            },
+        }
+
+    # 新用户：创建令牌并写入数据库
+    newapiclient.login()
     expired_time = int(time.time()) + 86400
-    # 创建免费试用令牌，1. 全模型可用 2. 额度50000 3。 1 天后过期
     trail_token = newapiclient.create_token(
         TokenConfig(
             name=email,
@@ -73,17 +105,17 @@ def main_register_user(
 
     # 生成装配文件
     setting = get_setting(token_key, model_limits)
-    # 查询 pg 库
     setting = json.dumps(setting)
-    update_settings = 'update "user" set settings = %s where email = %s'
     openwebuidata.connect()
-    openwebuidata.execute_command(update_settings, (setting, email))
+    openwebuidata.execute_command(
+        'UPDATE "user" SET settings = %s WHERE email = %s', (setting, email)
+    )
     openwebuidata.disconnect()
 
     # 更新用户中心信息
     newapidata.connect()
     newapidata.execute_command(
-        "insert into users_center (name, email, plan_level, plan_price, days_left, quota_left, recharge, token) values (%s, %s, %s, %s, %s, %s, %s, %s)",
+        "INSERT INTO users_center (name, email, plan_level, plan_price, days_left, quota_left, recharge, token) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
         (username, email, "free", 0, expired_time, 50000, 0, token_key),
     )
     newapidata.disconnect()
