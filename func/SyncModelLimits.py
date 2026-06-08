@@ -19,7 +19,7 @@ newapidata = NewApiDatabaseManager()
 openwebuidata = OpenWebUIDatabaseManager()
 
 EXCLUDED_NAME = ""
-EXCLUDED_GROUP = ""
+EXCLUDED_GROUP = "api"
 
 
 def _get_all_tokens_from_db():
@@ -122,7 +122,7 @@ def sync_model_limits():
             skipped_count += 1
             continue
         if token_group == EXCLUDED_GROUP:
-            logger.info(f"跳过 free 分组令牌: {token_name}")
+            logger.info(f"跳过 {token_group} 分组令牌: {token_name}")
             skipped_count += 1
             continue
 
