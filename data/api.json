@@ -1,0 +1,22 @@
+{
+    "chat": [
+        "anthropic/claude-haiku-4.5",
+        "anthropic/claude-sonnet-4.6",
+        "anthropic/claude-opus-4.6",
+        "anthropic/claude-opus-4.7",
+        "anthropic/claude-opus-4.8",
+        "openai/gpt-5.4-nano",
+        "openai/gpt-5.4-mini",
+        "openai/gpt-5.4",
+        "openai/gpt-5.5",
+        "gemini-3-flash-preview",
+        "gemini-3.1-flash-lite-preview",
+        "gemini-3.1-pro-preview",
+        "gemini-3.5-flash"
+    ],
+    "image": [
+        "openai/gpt-5.4-image-2",
+        "gemini-3.1-flash-image-preview",
+        "gemini-3-pro-image-preview"
+    ]
+}

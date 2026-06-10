@@ -18,8 +18,8 @@ logger = LoggerManager(log_file="sync_model_limits.log")
 newapidata = NewApiDatabaseManager()
 openwebuidata = OpenWebUIDatabaseManager()
 
-EXCLUDED_NAME = ""
-EXCLUDED_GROUP = "api"
+EXCLUDED_NAME = [""]
+EXCLUDED_GROUP = ["api", "claude code"]
 
 
 def _get_all_tokens_from_db():
@@ -117,11 +117,11 @@ def sync_model_limits():
             unlimited_quota, model_limits_enabled, model_limits, token_group = token_row
 
         # Step 3: 过滤排除项
-        if token_name == EXCLUDED_NAME:
+        if token_name in EXCLUDED_NAME:
             logger.info(f"跳过排除的令牌: {token_name}")
             skipped_count += 1
             continue
-        if token_group == EXCLUDED_GROUP:
+        if token_group in EXCLUDED_GROUP:
             logger.info(f"跳过 {token_group} 分组令牌: {token_name}")
             skipped_count += 1
             continue

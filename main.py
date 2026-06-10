@@ -4,7 +4,6 @@ from services.NewAPIClient import NewAPIClient
 from tools.LoggerManager import LoggerManager
 from tools.RequestVaild import *
 from tools.VerifyAdmin import get_admin_client
-from tools.RequestVaild import AdminTextUpdateRequest
 from middleware.ProtectionMiddleware import ProtectionMiddleware
 
 # 初始化 FastAPI 应用
@@ -112,6 +111,32 @@ async def generate_activation_codes(
 
     return batch_generate_activation_codes(
         tasks=request.tasks
+    )
+
+
+@app.post("/api/admin/batch-create-tokens")
+async def batch_create_tokens(
+    request: BatchCreateTokensRequest,
+    admin_client: NewAPIClient = Depends(get_admin_client),
+):
+    """
+    【管理员】批量创建 NewAPI 令牌
+
+    根据套餐类型（data/api.json 中的 key）批量创建令牌，
+    输入人民币价格，通过汇率转为美元后计算额度。
+    支持自定义过期时间，默认90天。
+
+    Args:
+        request: 包含数量、套餐类型、价格、过期时间的请求体
+        admin_client: 自动注入的已认证管理员客户端
+    """
+    from services.BatchCreateTokens import batch_create_tokens as do_batch_create
+
+    return do_batch_create(
+        n=request.n,
+        package=request.package,
+        price=request.price,
+        admin_client=admin_client,
     )
 
 
@@ -261,6 +286,34 @@ async def get_available_models():
         pricing_plan = json.load(f)
     pricing_plan.pop("free", None)
     return pricing_plan
+
+# ==================== 额度查询 ====================
+
+
+@app.post("/api/quota")
+async def query_quota(request: QuotaQueryRequest):
+    """
+    额度查询接口
+    输入用户 token (sk-xxx)，返回剩余额度信息
+    """
+    from services.QuotaQuery import query_quota as do_query
+    return do_query(token_key=request.token)
+
+
+# ==================== 体验接口 ====================
+
+
+@app.post("/api/experience")
+async def experience(request: ExperienceRequest):
+    """
+    体验接口
+    输入用户 key、模型、文本，返回对话结果
+    - 文本模型：返回对话内容
+    - 图片模型：返回 base64 编码的图片
+    """
+    from services.ExperienceAPI import call_experience
+    return call_experience(key=request.key, model=request.model, text=request.text)
+
 
 # ==================== 健康检查 ====================
 

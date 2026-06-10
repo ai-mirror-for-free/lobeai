@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 
 
@@ -79,3 +79,24 @@ class AdminTextUpdateRequest(BaseModel):
     password: str  # 管理员密码
     key: str  # 文本的 key
     content: str  # 文本内容
+
+
+class BatchCreateTokensRequest(BaseModel):
+    """批量创建 NewAPI 令牌请求（仅管理员）"""
+    username: str                               # 管理员用户名
+    password: str                               # 管理员密码
+    n: int = Field(..., gt=0, le=100)           # 创建数量
+    package: str                                # 套餐类型 (claude/openai/gemini/image)
+    price: float = Field(..., gt=0)             # 总价（人民币，额度计算时会转换为美元）
+
+
+class QuotaQueryRequest(BaseModel):
+    """额度查询请求"""
+    token: str  # 用户 token (sk-xxx)
+
+
+class ExperienceRequest(BaseModel):
+    """体验接口请求"""
+    key: str    # 用户 API key (sk-xxx)
+    model: str  # 模型名称
+    text: str   # 用户输入的文本
