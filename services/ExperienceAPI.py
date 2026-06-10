@@ -8,25 +8,16 @@ import base64
 import os
 import re
 import requests
+from tools.LoadApiConfig import get_image_models
 from tools.LoggerManager import LoggerManager
 
 logger = LoggerManager(log_file="experience_api.log")
 
-# 图片模型列表（与 api.json 中 image 套餐一致）
-IMAGE_MODELS = {
-    "openai/gpt-5.4-image-2",
-    "gemini-3.1-flash-image-preview",
-    "gemini-3-pro-image-preview",
-}
-
-# new-api 的 base URL（直接调用后端）
-NEWAPI_BASE = os.getenv("NEWAPI_URL", "http://154.64.231.128:25142")
-
 
 def is_image_model(model: str) -> bool:
-    """判断是否为图片模型"""
-    # 完全匹配
-    if model in IMAGE_MODELS:
+    """判断是否为图片模型（从 api.json 动态读取）"""
+    image_models = get_image_models()
+    if model in image_models:
         return True
     # 模糊匹配：包含 image 关键字
     if "image" in model.lower():
@@ -113,7 +104,7 @@ def call_experience(key: str, model: str, text: str) -> dict:
             "model": "模型名"
         }
     """
-    url = f"{NEWAPI_BASE}/v1/chat/completions"
+    url = f"{os.getenv('NEWAPI_URL', 'http://localhost:25142')}/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {key}",
         "Content-Type": "application/json",

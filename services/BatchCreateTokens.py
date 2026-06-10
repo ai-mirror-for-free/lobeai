@@ -2,13 +2,11 @@ import json
 import time
 import os
 from tools.GetNewestRate import get_usd_cny_rate
+from tools.LoadApiConfig import load_api_config
 from tools.LoggerManager import LoggerManager
 from services.NewAPIClient import NewAPIClient, TokenConfig
 
 logger = LoggerManager(log_file="batch_create_tokens.log")
-
-# data/api.json 路径
-API_JSON_PATH = os.path.join(os.path.dirname(__file__), "..", "data", "api.json")
 
 
 def batch_create_tokens(
@@ -35,9 +33,8 @@ def batch_create_tokens(
     # Step 1: 加载套餐定义并校验 package key
     # ---------------------------------------------------------------
     try:
-        with open(API_JSON_PATH, "r", encoding="utf-8") as f:
-            api_data = json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError) as e:
+        api_data = load_api_config()
+    except Exception as e:
         logger.error(f"无法加载 api.json: {e}")
         return {"status": False, "error": f"无法加载模型列表配置文件: {e}"}
 
