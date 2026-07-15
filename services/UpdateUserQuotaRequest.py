@@ -32,18 +32,33 @@ def get_user_info(username, email):
         "used_quota": user_key_info[2],
         "expired_time": user_key_info[3],
     }
-    sql = "select plan_level from users_center where name = %s and email = %s"
-    plan_level = db.execute_query(sql, (username, email))
-    plan_level = plan_level[0][0]
+    # email 是唯一判定键
+    sql = "select plan_level, name from users_center where email = %s"
+    rows = db.execute_query(sql, (email,))
+    if not rows:
+        logger.error(f"未找到 users_center 记录: email={email}")
+        db.disconnect()
+        return None
+    plan_level, stored_name = rows[0]
     user_key_info["plan_level"] = plan_level
+
+    # 如果用户名变了，同步到 users_center（email 是唯一判定，按 email 匹配）
+    if stored_name != username:
+        logger.info(
+            f"users_center.name 变更: {stored_name} -> {username}, email={email}"
+        )
+        db.execute_command(
+            "update users_center set name = %s where email = %s",
+            (username, email),
+        )
+
     # 更新用户中心 剩余时间，套餐余额
-    update_sql = "update users_center set days_left = %s,quota_left = %s where name = %s and email = %s"
+    update_sql = "update users_center set days_left = %s, quota_left = %s where email = %s"
     db.execute_command(
         update_sql,
         (
             user_key_info["expired_time"],
             user_key_info["remain_quota"],
-            username,
             email,
         ),
     )
