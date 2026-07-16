@@ -68,19 +68,21 @@ def _verify_signature(payload: str, signature: str) -> bool:
     return hmac.compare_digest(expected, signature)
 
 
-def generate_activation_code(plan_level: str, days: int) -> str:
+def generate_activation_code(plan_level: str, days: int = 0, quota: int = 0) -> str:
     """
     生成单个激活码 (不落库，仅生成)
 
     激活码格式: {base64(payload)}.{base64(signature)}
-    payload = plan_level:days:timestamp:code_id
+    payload = plan_level:days:timestamp:code_id:quota
+    - days: 套餐码使用 (1/30/90)，claude code 等基于 quota 的码写 0
+    - quota: 直接发放的额度值，套餐码写 0
 
     Returns:
-        激活码字符串，如 "ZGRlZmF1bHQ6MzA6MTcxMjM0NTY3ODkwOjFkMjM0NTY3ODkwYWJjZGVm"
+        激活码字符串，如 "ZGRlZmF1bHQ6MzA6MTcxMjM0NTY3ODkwOjFkMjM0NTY3ODkwYWJjZGVmOjUwMDAwMA==.<sig>"
     """
     timestamp = int(time.time())
     code_id = _generate_code_id()
-    payload = f"{plan_level}:{days}:{timestamp}:{code_id}"
+    payload = f"{plan_level}:{days}:{timestamp}:{code_id}:{quota}"
     payload_b64 = _payload_to_base64(payload)
     signature = _sign_payload(payload)
     return f"{payload_b64}.{signature}"
@@ -90,8 +92,11 @@ def parse_activation_code(code: str) -> Optional[dict]:
     """
     解析激活码，验证签名完整性
 
+    兼容旧格式 (4 段) 和新格式 (5 段，多 quota 字段)。
+    旧码解析后 quota=0。
+
     Returns:
-        {"plan_level": ..., "days": ..., "timestamp": ..., "code_id": ...} 或 None
+        {"plan_level", "days", "timestamp", "code_id", "quota"} 或 None
     """
     try:
         parts = code.strip().split(".")
@@ -105,15 +110,17 @@ def parse_activation_code(code: str) -> Optional[dict]:
             return None
 
         parts = payload.split(":")
-        if len(parts) != 4:
+        if len(parts) not in (4, 5):
             return None
 
-        plan_level, days_str, timestamp_str, code_id = parts
+        plan_level, days_str, timestamp_str, code_id = parts[:4]
+        quota = int(parts[4]) if len(parts) == 5 else 0
         return {
             "plan_level": plan_level,
             "days": int(days_str),
             "timestamp": int(timestamp_str),
             "code_id": code_id,
+            "quota": quota,
         }
     except Exception as e:
         logger.error(f"激活码解析异常: {e}")
@@ -151,14 +158,17 @@ class ActivationCodeManager:
         批量存储激活码（加密后存储）
 
         Args:
-            codes: [{"code": "...", "plan_level": "...", "days": ..., "code_id": "..."}, ...]
+            codes: [{"code": "...", "plan_level": "...", "days": ..., "code_id": "...",
+                     "quota": ...}, ...]
+                 quota 可省略（默认 0，向后兼容套餐码）
         """
         self.db.connect()
         for item in codes:
             encrypted = encrypt_password(item["code"])
+            quota = int(item.get("quota", 0) or 0)
             sql = f"""
-            INSERT INTO {self.TABLE_NAME} (encrypted_code, plan_level, days, code_id)
-            VALUES (%s, %s, %s, %s)
+            INSERT INTO {self.TABLE_NAME} (encrypted_code, plan_level, days, code_id, quota)
+            VALUES (%s, %s, %s, %s, %s)
             ON CONFLICT (code_id) DO NOTHING
             """
             self.db.execute_command(sql, (
@@ -166,13 +176,17 @@ class ActivationCodeManager:
                 item["plan_level"],
                 item["days"],
                 item["code_id"],
+                quota,
             ))
         self.db.disconnect()
 
     def find_by_code_id(self, code_id: str) -> Optional[dict]:
         """根据 code_id 查询激活码"""
         self.db.connect()
-        sql = f"SELECT id, encrypted_code, plan_level, days, created_at, used_at, used_by FROM {self.TABLE_NAME} WHERE code_id = %s"
+        sql = (
+            f"SELECT id, encrypted_code, plan_level, days, quota, "
+            f"created_at, used_at, used_by FROM {self.TABLE_NAME} WHERE code_id = %s"
+        )
         results = self.db.execute_query(sql, (code_id,))
         self.db.disconnect()
         if not results:
@@ -183,9 +197,10 @@ class ActivationCodeManager:
             "encrypted_code": row[1],
             "plan_level": row[2],
             "days": row[3],
-            "created_at": row[4],
-            "used_at": row[5],
-            "used_by": row[6],
+            "quota": row[4] or 0,
+            "created_at": row[5],
+            "used_at": row[6],
+            "used_by": row[7],
         }
 
     def mark_as_used(self, code_id: str, used_by: str):
@@ -205,23 +220,24 @@ class ActivationCodeManager:
     def get_stats_by_plan(self) -> list[dict]:
         """
         按套餐统计激活码信息
+        同一 plan_level + days + quota 视为同一批次
 
         Returns:
             [
-                {"plan_level": "default", "days": 30, "total": 10, "used": 2, "available": 8},
-                {"plan_level": "vip", "days": 90, "total": 5, "used": 1, "available": 4},
+                {"plan_level": "default", "days": 30, "quota": 0, "total": 10, "used": 2, "available": 8},
+                {"plan_level": "claude code", "days": 0, "quota": 500000, "total": 5, "used": 1, "available": 4},
                 ...
             ]
         """
         self.db.connect()
         sql = f"""
-            SELECT plan_level, days,
+            SELECT plan_level, days, COALESCE(quota, 0) AS quota,
                    COUNT(*) as total,
                    COUNT(used_at) as used,
                    COUNT(*) - COUNT(used_at) as available
             FROM {self.TABLE_NAME}
-            GROUP BY plan_level, days
-            ORDER BY plan_level, days
+            GROUP BY plan_level, days, COALESCE(quota, 0)
+            ORDER BY plan_level, days, COALESCE(quota, 0)
         """
         results = self.db.execute_query(sql)
         self.db.disconnect()
@@ -233,9 +249,10 @@ class ActivationCodeManager:
             {
                 "plan_level": row[0],
                 "days": row[1],
-                "total": row[2],
-                "used": row[3],
-                "available": row[4],
+                "quota": row[2],
+                "total": row[3],
+                "used": row[4],
+                "available": row[5],
             }
             for row in results
         ]
@@ -285,9 +302,10 @@ class ActivationCodeManager:
             logger.error(f"激活码不匹配: code_id={code_id}")
             return False, "激活码校验失败", {}
 
-        # 6. 验证 plan_level 和 days 与 payload 一致
+        # 6. 验证 plan_level / days / quota 与 payload 一致
         if (db_record["plan_level"] != parsed["plan_level"] or
-                db_record["days"] != parsed["days"]):
+                db_record["days"] != parsed["days"] or
+                db_record["quota"] != parsed["quota"]):
             return False, "激活码信息被篡改", {}
 
         # 验证成功，返回 code_id 用于后续标记已使用
@@ -296,4 +314,5 @@ class ActivationCodeManager:
             "plan_level": parsed["plan_level"],
             "days": parsed["days"],
             "code_id": code_id,
+            "quota": parsed["quota"],
         }

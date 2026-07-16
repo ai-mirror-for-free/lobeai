@@ -82,7 +82,13 @@ async def register_user(request: RegisterRequest):
 @app.post("/api/random-activation-code")
 async def random_activation_code(request: RandomActivationCodeRequest):
     """
-    激活码兑换接口
+    激活码兑换接口（统一入口）
+
+    按 plan_level 自动路由:
+    - "claude code"  → 创建/累加 NewAPI token "Claude Code - {email}"
+                        (三模型白名单, 永不过期, group="claude code")
+                        key 存在则累加 remain_quota，不换 key
+    - 其他 plan_level → 调用 buy_package 充值套餐
     """
     from services.RandomActivationCode import random_activation_code
 

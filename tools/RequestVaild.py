@@ -34,7 +34,11 @@ class UpdateUserQuotaRequest(BaseModel):
 
 
 class RandomActivationCodeRequest(BaseModel):
-    """激活码兑换请求"""
+    """激活码兑换请求（统一入口，套餐码/claude code 共用）
+
+    claude code 流程忽略 username 字段（按 email 唯一定位 token），
+    调用方可传 username=email 或任意值，接口层不校验其与 token 关系。
+    """
     code: str
     username: str
     email: str
