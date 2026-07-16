@@ -101,16 +101,34 @@ def parse_activation_code(code: str) -> Optional[dict]:
     try:
         parts = code.strip().split(".")
         if len(parts) != 2:
+            logger.warning(
+                f"[parse] 激活码格式错误 (期望 'payload.signature' 两段): "
+                f"code={code[:40]}... parts={len(parts)}"
+            )
             return None
         payload_b64, signature = parts
-        payload = _base64_to_payload(payload_b64)
+        try:
+            payload = _base64_to_payload(payload_b64)
+        except Exception as e:
+            logger.warning(
+                f"[parse] payload base64 解码失败: {e}, "
+                f"payload_b64={payload_b64[:40]}..., code={code[:40]}..."
+            )
+            return None
 
         if not _verify_signature(payload, signature):
-            logger.warning(f"激活码签名验证失败: {code[:20]}...")
+            logger.warning(
+                f"[parse] HMAC 签名验证失败 (可能 ENCRYPTION_KEY 不一致 或 激活码被篡改): "
+                f"payload={payload}, code={code[:40]}..."
+            )
             return None
 
         parts = payload.split(":")
         if len(parts) not in (4, 5):
+            logger.warning(
+                f"[parse] payload 段数异常 (期望 4 或 5): got={len(parts)}, "
+                f"payload={payload}, code={code[:40]}..."
+            )
             return None
 
         plan_level, days_str, timestamp_str, code_id = parts[:4]
@@ -123,7 +141,7 @@ def parse_activation_code(code: str) -> Optional[dict]:
             "quota": quota,
         }
     except Exception as e:
-        logger.error(f"激活码解析异常: {e}")
+        logger.error(f"[parse] 激活码解析异常: {e}, code={code[:40]}...")
         return None
 
 
@@ -193,22 +211,36 @@ class ActivationCodeManager:
         排查时检查 logs/db.log 看是否有 "查询执行失败" 字样。
         """
         self.db.connect()
+        if not self.db.conn:
+            logger.error(
+                f"[find_by_code_id] DB 连接失败: code_id={code_id[:16]}..."
+            )
+            return None
         sql = (
             f"SELECT id, encrypted_code, plan_level, days, quota, "
             f"created_at, used_at, used_by FROM {self.TABLE_NAME} WHERE code_id = %s"
         )
+        logger.info(
+            f"[find_by_code_id] 执行查询: code_id={code_id[:16]}..., "
+            f"sql={sql[:80]}..."
+        )
         results = self.db.execute_query(sql, (code_id,))
+        # 区分"无结果"和"SQL 失败": execute_query 失败会写 ERROR 到 app.log,
+        # 后续看 connection status 判断 (rollback 后 conn.status 会变)。
+        # 这里只能从 results 直接判断。
         self.db.disconnect()
         if not results:
-            # 区分"不存在"和"查询失败"：execute_query 失败时不返回 row，
-            # 而 DB 不存在时也返回空列表。这两种在结果上无法区分，
-            # 但日志里 execute_query 失败时会写 ERROR，可据此排查。
             logger.warning(
                 f"[find_by_code_id] 未返回结果, code_id={code_id[:16]}..., "
                 f"可能原因: (1) DB 中无此 code_id (2) SQL 执行失败 (列缺失/连接问题)"
+                f"  排查: 看 logs/app.log 是否有 '查询执行失败'"
             )
             return None
         row = results[0]
+        logger.info(
+            f"[find_by_code_id] 命中: id={row[0]}, plan_level={row[2]}, "
+            f"days={row[3]}, quota={row[4]}, used_at={row[6]}"
+        )
         return {
             "id": row[0],
             "encrypted_code": row[1],
@@ -287,14 +319,33 @@ class ActivationCodeManager:
         Returns:
             (success, message, plan_info) - plan_info 包含 code_id 用于后续标记
         """
+        logger.info(
+            f"[random_code] 开始验证激活码: used_by={used_by}, "
+            f"code={code[:40]}...({len(code)} chars)"
+        )
+
         # 1. 解析并验证签名
         parsed = parse_activation_code(code)
         if not parsed:
+            logger.warning(
+                f"[random_code] parse_activation_code 返回 None: "
+                f"code={code[:40]}..., used_by={used_by}"
+            )
             return False, "激活码无效", {}
+
+        logger.info(
+            f"[random_code] 解析成功: plan_level={parsed['plan_level']}, "
+            f"days={parsed['days']}, code_id={parsed['code_id']}, "
+            f"quota={parsed['quota']}, timestamp={parsed['timestamp']}"
+        )
 
         # 2. 完整性检查（有效期）
         valid, reason = validate_activation_code_integrity(code)
         if not valid:
+            logger.warning(
+                f"[random_code] validate_activation_code_integrity 失败: "
+                f"reason={reason}"
+            )
             return False, reason, {}
 
         code_id = parsed["code_id"]
@@ -302,10 +353,19 @@ class ActivationCodeManager:
         # 3. 从数据库查找
         db_record = self.find_by_code_id(code_id)
         if not db_record:
+            logger.warning(
+                f"[random_code] DB 未找到记录: code_id={code_id}, "
+                f"plan_level={parsed['plan_level']}, "
+                f"提示: 查看 logs/app.log 是否有 '查询执行失败' (可能是 quota 列不存在)"
+            )
             return False, "激活码不存在或已失效", {}
 
         # 4. 检查是否已使用
         if db_record["used_at"]:
+            logger.warning(
+                f"[random_code] 激活码已被使用: code_id={code_id}, "
+                f"used_at={db_record['used_at']}, used_by={db_record['used_by']}"
+            )
             return False, "激活码已被使用", {}
 
         # 5. 解密并匹配
@@ -316,17 +376,28 @@ class ActivationCodeManager:
             return False, "激活码解密失败，系统异常", {}
 
         if decrypted != code:
-            logger.error(f"激活码不匹配: code_id={code_id}")
+            logger.error(
+                f"[random_code] 激活码解密后与输入不匹配: code_id={code_id}, "
+                f"提示: ENCRYPTION_KEY 可能不一致，或 DB 中密文来自其他密钥"
+            )
             return False, "激活码校验失败", {}
 
         # 6. 验证 plan_level / days / quota 与 payload 一致
         if (db_record["plan_level"] != parsed["plan_level"] or
                 db_record["days"] != parsed["days"] or
                 db_record["quota"] != parsed["quota"]):
+            logger.error(
+                f"[random_code] 激活码信息不一致: code_id={code_id}, "
+                f"parsed=({parsed['plan_level']},{parsed['days']},{parsed['quota']}), "
+                f"db=({db_record['plan_level']},{db_record['days']},{db_record['quota']})"
+            )
             return False, "激活码信息被篡改", {}
 
         # 验证成功，返回 code_id 用于后续标记已使用
-        logger.info(f"激活码验证成功: code_id={code_id}")
+        logger.info(
+            f"激活码验证成功: code_id={code_id}, "
+            f"plan_level={parsed['plan_level']}, quota={parsed['quota']}"
+        )
         return True, "验证成功", {
             "plan_level": parsed["plan_level"],
             "days": parsed["days"],
