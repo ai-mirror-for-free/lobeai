@@ -181,7 +181,17 @@ class ActivationCodeManager:
         self.db.disconnect()
 
     def find_by_code_id(self, code_id: str) -> Optional[dict]:
-        """根据 code_id 查询激活码"""
+        """
+        根据 code_id 查询激活码
+
+        Returns:
+            dict 或 None
+            - None: 两种可能 (调用方应区分)
+              a) code_id 在 DB 中确实不存在
+              b) SQL 执行异常（列不存在、连接失败等），execute_query 静默返回 None
+
+        排查时检查 logs/db.log 看是否有 "查询执行失败" 字样。
+        """
         self.db.connect()
         sql = (
             f"SELECT id, encrypted_code, plan_level, days, quota, "
@@ -190,6 +200,13 @@ class ActivationCodeManager:
         results = self.db.execute_query(sql, (code_id,))
         self.db.disconnect()
         if not results:
+            # 区分"不存在"和"查询失败"：execute_query 失败时不返回 row，
+            # 而 DB 不存在时也返回空列表。这两种在结果上无法区分，
+            # 但日志里 execute_query 失败时会写 ERROR，可据此排查。
+            logger.warning(
+                f"[find_by_code_id] 未返回结果, code_id={code_id[:16]}..., "
+                f"可能原因: (1) DB 中无此 code_id (2) SQL 执行失败 (列缺失/连接问题)"
+            )
             return None
         row = results[0]
         return {
