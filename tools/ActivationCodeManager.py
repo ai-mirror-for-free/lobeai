@@ -171,15 +171,22 @@ class ActivationCodeManager:
     def __init__(self):
         self.db = NewApiDatabaseManager()
 
-    def save_codes(self, codes: List[dict]):
+    def save_codes(self, codes: List[dict]) -> dict:
         """
-        批量存储激活码（加密后存储）
+        批量存储激活码（加密后存储），返回每条 INSERT 的真实结果
 
         Args:
             codes: [{"code": "...", "plan_level": "...", "days": ..., "code_id": "...",
                      "quota": ...}, ...]
                  quota 可省略（默认 0，向后兼容套餐码）
+
+        Returns:
+            {
+                "success": [code_id, ...],     # 真正 INSERT 成功的 code_id
+                "failed":  [{"code_id": ..., "reason": "..."}, ...],  # 失败的明细
+            }
         """
+        result = {"success": [], "failed": []}
         self.db.connect()
         for item in codes:
             encrypted = encrypt_password(item["code"])
@@ -189,33 +196,48 @@ class ActivationCodeManager:
             VALUES (%s, %s, %s, %s, %s)
             ON CONFLICT (code_id) DO NOTHING
             """
-            self.db.execute_command(sql, (
+            ok = self.db.execute_command(sql, (
                 encrypted,
                 item["plan_level"],
                 item["days"],
                 item["code_id"],
                 quota,
             ))
+            if ok:
+                result["success"].append(item["code_id"])
+            else:
+                # execute_command 失败时日志已写 ERROR，这里只补充上下文
+                result["failed"].append({
+                    "code_id": item["code_id"],
+                    "reason": "INSERT 执行失败，详见 logs/app.log",
+                })
+                logger.error(
+                    f"[save_codes] INSERT 失败: code_id={item['code_id'][:16]}..., "
+                    f"plan_level={item['plan_level']}, quota={quota}"
+                )
         self.db.disconnect()
+        if result["failed"]:
+            logger.warning(
+                f"[save_codes] 批量存储完成: success={len(result['success'])}, "
+                f"failed={len(result['failed'])}"
+            )
+        return result
 
     def find_by_code_id(self, code_id: str) -> Optional[dict]:
         """
         根据 code_id 查询激活码
 
         Returns:
-            dict 或 None
-            - None: 两种可能 (调用方应区分)
-              a) code_id 在 DB 中确实不存在
-              b) SQL 执行异常（列不存在、连接失败等），execute_query 静默返回 None
-
-        排查时检查 logs/db.log 看是否有 "查询执行失败" 字样。
+            dict 或 None (truly not found)
+        Raises:
+            RuntimeError: SQL 执行失败 / DB 连接失败（区别于"激活码不存在"）
         """
         self.db.connect()
         if not self.db.conn:
             logger.error(
                 f"[find_by_code_id] DB 连接失败: code_id={code_id[:16]}..."
             )
-            return None
+            raise RuntimeError("DB 连接失败")
         sql = (
             f"SELECT id, encrypted_code, plan_level, days, quota, "
             f"created_at, used_at, used_by FROM {self.TABLE_NAME} WHERE code_id = %s"
@@ -224,16 +246,29 @@ class ActivationCodeManager:
             f"[find_by_code_id] 执行查询: code_id={code_id[:16]}..., "
             f"sql={sql[:80]}..."
         )
-        results = self.db.execute_query(sql, (code_id,))
-        # 区分"无结果"和"SQL 失败": execute_query 失败会写 ERROR 到 app.log,
-        # 后续看 connection status 判断 (rollback 后 conn.status 会变)。
-        # 这里只能从 results 直接判断。
+        # 直接执行，不再走 execute_query（execute_query 会吞异常）。
+        # 这里 try/except 让 SQL 错误显式抛出到 random_code 那里。
+        try:
+            with self.db.conn.cursor() as cur:
+                cur.execute(sql, (code_id,))
+                results = cur.fetchall()
+        except Exception as e:
+            logger.error(
+                f"[find_by_code_id] SQL 执行失败: {e}, "
+                f"code_id={code_id[:16]}... "
+                f"(可能原因: quota 列缺失/类型不对/权限不足/表不存在)"
+            )
+            try:
+                self.db.conn.rollback()
+            except Exception:
+                pass
+            self.db.disconnect()
+            raise RuntimeError(f"SQL 执行失败: {e}") from e
         self.db.disconnect()
         if not results:
             logger.warning(
-                f"[find_by_code_id] 未返回结果, code_id={code_id[:16]}..., "
-                f"可能原因: (1) DB 中无此 code_id (2) SQL 执行失败 (列缺失/连接问题)"
-                f"  排查: 看 logs/app.log 是否有 '查询执行失败'"
+                f"[find_by_code_id] 未返回结果 (DB 中确实不存在此 code_id): "
+                f"code_id={code_id[:16]}..."
             )
             return None
         row = results[0]
@@ -350,13 +385,22 @@ class ActivationCodeManager:
 
         code_id = parsed["code_id"]
 
-        # 3. 从数据库查找
-        db_record = self.find_by_code_id(code_id)
+        # 3. 从数据库查找 (SQL 失败会抛 RuntimeError，需要 catch)
+        try:
+            db_record = self.find_by_code_id(code_id)
+        except RuntimeError as e:
+            # SQL 执行失败 / DB 连接失败 —— 明确告诉调用方是 DB 异常
+            logger.error(
+                f"[random_code] DB 查询失败（不是激活码不存在）: {e}, "
+                f"code_id={code_id}, used_by={used_by}"
+            )
+            return False, f"系统异常：DB 查询失败 ({e})", {}
+
         if not db_record:
+            # DB 中确实没这条记录（SQL 成功但 0 行）
             logger.warning(
-                f"[random_code] DB 未找到记录: code_id={code_id}, "
-                f"plan_level={parsed['plan_level']}, "
-                f"提示: 查看 logs/app.log 是否有 '查询执行失败' (可能是 quota 列不存在)"
+                f"[random_code] DB 未找到记录 (SQL 执行成功但 0 行): code_id={code_id}, "
+                f"plan_level={parsed['plan_level']}, used_by={used_by}"
             )
             return False, "激活码不存在或已失效", {}
 

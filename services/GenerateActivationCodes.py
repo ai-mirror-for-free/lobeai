@@ -210,14 +210,24 @@ def batch_generate_activation_codes(
 
             # 每100条批量存储
             if len(codes_to_save) >= 100:
-                manager.save_codes(codes_to_save)
-                total_saved += len(codes_to_save)
+                save_result = manager.save_codes(codes_to_save)
+                total_saved += len(save_result.get("success", []))
+                if save_result.get("failed"):
+                    for f in save_result["failed"]:
+                        errors.append(
+                            f"INSERT 失败: code_id={f['code_id'][:16]}..., {f['reason']}"
+                        )
                 codes_to_save = []
 
         # 剩余的也存进去
         if codes_to_save:
-            manager.save_codes(codes_to_save)
-            total_saved += len(codes_to_save)
+            save_result = manager.save_codes(codes_to_save)
+            total_saved += len(save_result.get("success", []))
+            if save_result.get("failed"):
+                for f in save_result["failed"]:
+                    errors.append(
+                        f"INSERT 失败: code_id={f['code_id'][:16]}..., {f['reason']}"
+                    )
 
         result_item = {
             "plan_level": plan_level,
