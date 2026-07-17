@@ -5,15 +5,29 @@ from tools.LoggerManager import LoggerManager
 from tools.password_encryption import get_decrypted_password
 
 class DatabaseManager:
-    """管理 PostgreSQL 数据库的操作类"""
+    """管理 PostgreSQL 数据库的操作类
 
-    def __init__(self, env_path=".env", db_name="oneapi"):
+    支持多实例 (例如 LOCAL 副本 NewAPI): 通过显式参数或 DB_*_LOCAL env
+    override 默认连接。fallback 链 (按字段独立): 显式参数 > *_LOCAL env > 默认 env
+    """
+
+    def __init__(self, env_path=".env", db_name="oneapi",
+                 db_host=None, db_port=None, db_user=None, db_password=None):
         load_dotenv(env_path)
-        self.host = os.getenv("DB_HOST", "localhost")
-        self.port = os.getenv("DB_PORT", "5432")
-        self.user = os.getenv("DB_USERNAME")
-        # 从环境变量读取加密的数据库密码并解密
-        self.password = get_decrypted_password("DB_PASSWORD_ENCRYPTED")
+        # host/port/user 任一字段允许单独 override
+        self.host = db_host or os.getenv("DB_HOST_LOCAL") or os.getenv("DB_HOST", "localhost")
+        self.port = db_port or os.getenv("DB_PORT_LOCAL") or os.getenv("DB_PORT", "5432")
+        self.user = db_user or os.getenv("DB_USERNAME_LOCAL") or os.getenv("DB_USERNAME")
+        # 密码: 显式传入的 password 直接用 (不二次解密); 否则优先 LOCAL 密文, 再回退默认
+        if db_password is not None:
+            self.password = db_password
+        else:
+            local_enc = os.getenv("DB_PASSWORD_ENCRYPTED_LOCAL")
+            self.password = (
+                get_decrypted_password("DB_PASSWORD_ENCRYPTED_LOCAL")
+                if local_enc
+                else get_decrypted_password("DB_PASSWORD_ENCRYPTED")
+            )
         self.dbname = db_name
         self.conn = None
         self.logger = LoggerManager()
@@ -75,9 +89,17 @@ class DatabaseManager:
         
 
 class NewApiDatabaseManager(DatabaseManager):
-    """管理 new-api 数据库的操作类"""
-    def __init__(self, env_path=".env", db_name="oneapi"):
-        super().__init__(env_path, db_name)
+    """管理 new-api 数据库的操作类
+
+    支持多 NewAPI 实例: 通过显式参数或 DB_*_LOCAL env 切换到 LOCAL 副本的连接。
+    """
+    def __init__(self, env_path=".env", db_name="oneapi",
+                 db_host=None, db_port=None, db_user=None, db_password=None):
+        super().__init__(
+            env_path, db_name,
+            db_host=db_host, db_port=db_port,
+            db_user=db_user, db_password=db_password,
+        )
 
 
 class OpenWebUIDatabaseManager(DatabaseManager):

@@ -26,6 +26,29 @@ CLAUDE_PLAN_LEVEL = "claude code"     # 激活码 plan_level + NewAPI token grou
 NAME_PREFIX = "Claude Code - "        # NewAPI token name 前缀
 
 
+def _get_local_claude_clients() -> tuple["NewAPIClient", "NewApiDatabaseManager"]:
+    """
+    组装 claude code 专用的 NewAPIClient + NewApiDatabaseManager（指向 LOCAL 实例）
+
+    LOCAL DB 仅 host 可能不同 (DB_HOST_LOCAL)，user/password/port 走默认 env 回退
+    （DbScript 内部已实现 fallback 链）。client.db 与 db 共享同一个 LOCAL 连接，
+    这样 create_token 内部 _get_full_token_key_from_db 也会自动走 LOCAL DB，
+    拿到新建 token 的完整 sk-xxx（不会拿成 "***"）。
+    """
+    local_url = os.getenv("NEWAPI_URL_LOCAL")
+    if not local_url:
+        raise RuntimeError("未配置 NEWAPI_URL_LOCAL，无法兑换 claude code 激活码")
+    local_url = local_url.rstrip("/")
+
+    local_db = NewApiDatabaseManager()  # 内部自动读 DB_HOST_LOCAL
+    local_client = NewAPIClient(base_url=local_url, db=local_db)
+    logger.info(
+        f"[claude_code] LOCAL 资源就绪: url={local_url}, "
+        f"db_host={local_db.host}, db_name={local_db.dbname}"
+    )
+    return local_client, local_db
+
+
 def _load_claude_models() -> list[str]:
     """从 data/claude.json 加载 claude 套餐的模型列表"""
     path = os.path.join(os.path.dirname(__file__), "..", "data", "claude.json")
@@ -75,8 +98,9 @@ def redeem_claude_token_after_validation(
         logger.error(f"[claude_code] 用户登录失败: {e}, email={email}")
         return {"status": False, "message": f"用户登录失败: {e}"}
 
-    # ── 2) token 操作 ──
-    db = NewApiDatabaseManager()
+    # ── 2) token 操作（全部走 LOCAL 实例） ──
+    newapiclient, db = _get_local_claude_clients()
+
     db.connect()
     rows = db.execute_query(
         "SELECT id, key, remain_quota FROM tokens "
@@ -85,7 +109,6 @@ def redeem_claude_token_after_validation(
     )
     db.disconnect()
 
-    newapiclient = NewAPIClient()
     newapiclient.login()
     try:
         if rows:

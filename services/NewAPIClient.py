@@ -6,8 +6,10 @@ New API Client
 import os
 import requests
 from dataclasses import dataclass, field
+from typing import Optional
 from dotenv import load_dotenv
 from tools.password_encryption import get_decrypted_password
+from tools.DbScript import NewApiDatabaseManager  # 多 NewAPI 实例时由调用方显式注入
 
 @dataclass
 class TokenConfig:
@@ -27,13 +29,22 @@ class NewAPIClient:
     New API 管理客户端
     """
 
-    def __init__(self):
+    def __init__(self, base_url: Optional[str] = None, db: Optional[NewApiDatabaseManager] = None):
+        """
+        Args:
+            base_url: NewAPI 根地址。None 时从环境变量 NEWAPI_URL 读取。
+                      多 NewAPI 实例 (如 LOCAL) 可显式传 NEWAPI_URL_LOCAL。
+            db:       用于 _get_full_token_key_from_db 的数据库连接。
+                      None 时该方法内部新建默认 NewApiDatabaseManager()（向后兼容）。
+                      多 NewAPI 实例 (如 LOCAL) 应传对应实例的 db，否则
+                      _get_full_token_key_from_db 会查错 DB 拿不到完整 key。
+        """
         load_dotenv()
-        self.base_url = os.getenv("NEWAPI_URL")
+        self.base_url = (base_url or os.getenv("NEWAPI_URL")).rstrip("/")
         self.session = requests.Session()
         self.session.headers.update({"Content-Type": "application/json"})
         self.user_id = None
-        self.db = None  # 数据库连接，用于获取完整的 token key
+        self.db = db  # 数据库连接，用于获取完整的 token key
 
     # ──────────────────────────────────────────────
     # 认证
@@ -150,15 +161,10 @@ class NewAPIClient:
         """
         从数据库获取完整的 token key（绕过 API 的屏蔽）
 
-        Args:
-            token_id: 令牌 ID
-
-        Returns:
-            包含完整 key 的 token dict，如果查询失败则返回 None
+        优先使用 __init__ 注入的 self.db（多 NewAPI 实例时关键），否则新建默认 DB。
         """
         try:
-            from tools.DbScript import NewApiDatabaseManager
-            db = NewApiDatabaseManager()
+            db = self.db if self.db is not None else NewApiDatabaseManager()
             db.connect()
             # 数据库表结构: id, user_id, key, status, name, created_time, accessed_time, expired_time, ...
             result = db.execute_query(
