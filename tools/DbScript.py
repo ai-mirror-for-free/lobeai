@@ -7,27 +7,23 @@ from tools.password_encryption import get_decrypted_password
 class DatabaseManager:
     """管理 PostgreSQL 数据库的操作类
 
-    支持多实例 (例如 LOCAL 副本 NewAPI): 通过显式参数或 DB_*_LOCAL env
-    override 默认连接。fallback 链 (按字段独立): 显式参数 > *_LOCAL env > 默认 env
+    默认连接只读默认 DB_* env。多 NewAPI 实例 (如 LOCAL 副本) 需调用方显式传
+    db_host/db_port/db_user/db_password override;本类不自动读 DB_*_LOCAL env
+    (否则会污染同进程内所有 NewApiDatabaseManager() 调用, 例如 ActivationCodeManager)。
     """
 
     def __init__(self, env_path=".env", db_name="oneapi",
                  db_host=None, db_port=None, db_user=None, db_password=None):
         load_dotenv(env_path)
-        # host/port/user 任一字段允许单独 override
-        self.host = db_host or os.getenv("DB_HOST_LOCAL") or os.getenv("DB_HOST", "localhost")
-        self.port = db_port or os.getenv("DB_PORT_LOCAL") or os.getenv("DB_PORT", "5432")
-        self.user = db_user or os.getenv("DB_USERNAME_LOCAL") or os.getenv("DB_USERNAME")
-        # 密码: 显式传入的 password 直接用 (不二次解密); 否则优先 LOCAL 密文, 再回退默认
+        # 默认 env, 任一字段可被显式参数 override
+        self.host = db_host or os.getenv("DB_HOST", "localhost")
+        self.port = db_port or os.getenv("DB_PORT", "5432")
+        self.user = db_user or os.getenv("DB_USERNAME")
+        # 密码: 显式传入的 password 直接用 (不二次解密); 否则用默认密文 env
         if db_password is not None:
             self.password = db_password
         else:
-            local_enc = os.getenv("DB_PASSWORD_ENCRYPTED_LOCAL")
-            self.password = (
-                get_decrypted_password("DB_PASSWORD_ENCRYPTED_LOCAL")
-                if local_enc
-                else get_decrypted_password("DB_PASSWORD_ENCRYPTED")
-            )
+            self.password = get_decrypted_password("DB_PASSWORD_ENCRYPTED")
         self.dbname = db_name
         self.conn = None
         self.logger = LoggerManager()
@@ -91,7 +87,8 @@ class DatabaseManager:
 class NewApiDatabaseManager(DatabaseManager):
     """管理 new-api 数据库的操作类
 
-    支持多 NewAPI 实例: 通过显式参数或 DB_*_LOCAL env 切换到 LOCAL 副本的连接。
+    默认连默认 NewAPI 的 oneapi 库。LOCAL 副本需调用方显式传 db_host 等 override,
+    不自动读 DB_*_LOCAL env (原因见 DatabaseManager docstring)。
     """
     def __init__(self, env_path=".env", db_name="oneapi",
                  db_host=None, db_port=None, db_user=None, db_password=None):

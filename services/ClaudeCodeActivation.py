@@ -30,17 +30,28 @@ def _get_local_claude_clients() -> tuple["NewAPIClient", "NewApiDatabaseManager"
     """
     组装 claude code 专用的 NewAPIClient + NewApiDatabaseManager（指向 LOCAL 实例）
 
-    LOCAL DB 仅 host 可能不同 (DB_HOST_LOCAL)，user/password/port 走默认 env 回退
-    （DbScript 内部已实现 fallback 链）。client.db 与 db 共享同一个 LOCAL 连接，
-    这样 create_token 内部 _get_full_token_key_from_db 也会自动走 LOCAL DB，
-    拿到新建 token 的完整 sk-xxx（不会拿成 "***"）。
+    通过显式 db_host=os.getenv("DB_HOST_LOCAL") 让 NewApiDatabaseManager 连 LOCAL 的 PG。
+    注意: DB_*_LOCAL env 不会被 DatabaseManager 自动读取, 必须由调用方显式传入
+    (否则同进程内所有 NewApiDatabaseManager() 都会被切走, 污染 ActivationCodeManager)。
+    user/password/port 走默认 env (本项目 LOCAL 与默认 NewAPI 共用账号密码)。
+
+    client.db 与 db 共享同一个 LOCAL 连接, 这样 create_token 内部
+    _get_full_token_key_from_db 也会自动走 LOCAL DB, 拿到完整 sk-xxx (不会拿成 "***")。
     """
     local_url = os.getenv("NEWAPI_URL_LOCAL")
     if not local_url:
         raise RuntimeError("未配置 NEWAPI_URL_LOCAL，无法兑换 claude code 激活码")
     local_url = local_url.rstrip("/")
 
-    local_db = NewApiDatabaseManager()  # 内部自动读 DB_HOST_LOCAL
+    local_db = NewApiDatabaseManager(
+        db_host=os.getenv("DB_HOST_LOCAL"),  # 用户在 .env 加 DB_HOST_LOCAL=192.168.28.2
+    )
+    if local_db.host == "localhost":
+        # 显式提醒: 配了 NEWAPI_URL_LOCAL 但忘了配 DB_HOST_LOCAL
+        logger.warning(
+            "[claude_code] DB_HOST_LOCAL 未配置, LOCAL DB 回退到 localhost; "
+            "请确认 .env 里 DB_HOST_LOCAL 是否设置正确"
+        )
     local_client = NewAPIClient(base_url=local_url, db=local_db)
     logger.info(
         f"[claude_code] LOCAL 资源就绪: url={local_url}, "
