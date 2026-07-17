@@ -55,7 +55,7 @@ def _build_openwebui_settings(token_key: str, model_limits: list) -> str:
 def _determine_plan_level(token_name: str, token_group: str) -> str:
     """
     根据令牌信息推断套餐级别
-    group 字段对应套餐级别: free, default, vip, svip
+    group 字段对应套餐级别: default, vip, svip, claude code, api 等
     """
     if token_group and token_group != "":
         return token_group

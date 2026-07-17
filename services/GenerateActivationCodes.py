@@ -41,7 +41,7 @@ def _rmb_to_quota(price_rmb: float) -> int:
 def get_valid_plans():
     """
     激活码的有效 plan_level 列表：
-    - pricing_plan.json 中除 free 外的 key
+    - pricing_plan.json 中所有 key
     - 加上 "claude code" (claude_code 激活码专用)
 
     返回值示例: ["default", "vip", "svip", "claude code"]
@@ -52,8 +52,7 @@ def get_valid_plans():
         with open(pricing_file, 'r') as f:
             data = json.load(f)
             for p in data.keys():
-                if p != "free":
-                    valid.add(p)
+                valid.add(p)
     except Exception as e:
         logger.error(f"加载 pricing_plan.json 失败: {e}")
         for fallback in ("default", "vip", "svip"):

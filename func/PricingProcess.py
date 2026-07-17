@@ -9,7 +9,6 @@ model_list = data["model"].to_list()
 
 # 套餐价格（元/天）
 PLAN_PRICES = {
-    "free": 0,
     "default": 1,
     "vip": 2,
     "svip": 4,

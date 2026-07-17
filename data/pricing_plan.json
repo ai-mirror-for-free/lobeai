@@ -1,12 +1,4 @@
 {
-    "free": {
-        "modele_list": [
-            "gemini-3-flash-preview",
-            "openai/gpt-5.4-nano",
-            "anthropic/claude-haiku-4.5"
-        ],
-        "price": 0
-    },
     "default": {
         "modele_list": [
             "gemini-3.1-flash-lite-preview",

@@ -50,10 +50,6 @@ def buy_package(username: str, email: str, password: str, plan_level: str, days:
         logger.error(f"未找到用户: email={email}, name={username}")
         return {"status": False, "message": "用户不存在"}
     plan_level_old, token_old, expired_time = result[0]
-    if plan_level_old == "free":
-        logger.info("用户是免费用户")
-        remain_quota = 0
-        expired_time = int(time.time())
     # 计算新的额度和模型列表
     plan_info = PRICING_PLAN[plan_level]
     rate_result = get_usd_cny_rate()
