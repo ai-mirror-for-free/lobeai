@@ -1,23 +1,28 @@
 """
-claude_code 激活码兑换核心模块
+claude_code 激活码兑换核心模块（2026-07-23 委派给 server_b）
 
-本模块对外暴露两个函数：
+本模块对外暴露两个函数（保持原有签名 + 返回结构不变）：
 - redeem_claude_activation_code(code, email, password) —— 独立完整入口（自己验证激活码）
 - redeem_claude_token_after_validation(code_id, code, email, password, quota)
-  —— 仅执行「登录 + token 创建/累加 + 标记已使用」，调用方负责 random_code 验证
-    用于在 RandomActivationCode 的统一入口里按 plan_level 路由时复用。
+  —— 仅执行「调 server_b → 拿到 token 字段」，调用方负责 random_code 验证
+  用于在 RandomActivationCode 的统一入口里按 plan_level 路由时复用。
+
+设计变更：
+- 不再直连 B 侧 NewAPI / PG；改成调一次 server_b /activation/redeem
+- 鉴权：B 侧 NewAPI 登录账号来自 lobeai 透传的 email + password（两边 NewAPI 账号一致）
+- 失败语义：所有 B 侧失败统一转 {status: false, message: ...}，不触发外层 mark_as_used
+- OpenWebUI 链路（services.OpenWebuiAuth）完全不动；本模块不再调用
 
 注意: 本模块流程与 RandomActivationCode.random_activation_code 中的套餐码分支互斥，
-      但复用同一个 ActivationCodeManager.mark_as_used。
+      但复用同一个 ActivationCodeManager.mark_as_used（外层 RandomActivationCode 行 154
+      会在子流程返回 status:true 之后调用；本模块不再内嵌 mark_as_used）。
 """
 import json
 import os
 
+import requests
+
 from tools.LoggerManager import LoggerManager
-from tools.DbScript import NewApiDatabaseManager
-from tools.ActivationCodeManager import ActivationCodeManager
-from services.NewAPIClient import NewAPIClient, TokenConfig
-from services.OpenWebuiAuth import get_jwt_token
 
 logger = LoggerManager(log_file="claude_code_activation.log")
 
@@ -26,46 +31,85 @@ CLAUDE_PLAN_LEVEL = "claude code"     # 激活码 plan_level + NewAPI token grou
 NAME_PREFIX = "Claude Code - "        # NewAPI token name 前缀
 
 
-def _get_local_claude_clients() -> tuple["NewAPIClient", "NewApiDatabaseManager"]:
-    """
-    组装 claude code 专用的 NewAPIClient + NewApiDatabaseManager（指向 LOCAL 实例）
-
-    通过显式 db_host=os.getenv("DB_HOST_LOCAL") 让 NewApiDatabaseManager 连 LOCAL 的 PG。
-    注意: DB_*_LOCAL env 不会被 DatabaseManager 自动读取, 必须由调用方显式传入
-    (否则同进程内所有 NewApiDatabaseManager() 都会被切走, 污染 ActivationCodeManager)。
-    user/password/port 走默认 env (本项目 LOCAL 与默认 NewAPI 共用账号密码)。
-
-    client.db 与 db 共享同一个 LOCAL 连接, 这样 create_token 内部
-    _get_full_token_key_from_db 也会自动走 LOCAL DB, 拿到完整 sk-xxx (不会拿成 "***")。
-    """
-    local_url = os.getenv("NEWAPI_URL_LOCAL")
-    if not local_url:
-        raise RuntimeError("未配置 NEWAPI_URL_LOCAL，无法兑换 claude code 激活码")
-    local_url = local_url.rstrip("/")
-
-    local_db = NewApiDatabaseManager(
-        db_host=os.getenv("DB_HOST_LOCAL"),  # 用户在 .env 加 DB_HOST_LOCAL=192.168.28.2
-    )
-    if local_db.host == "localhost":
-        # 显式提醒: 配了 NEWAPI_URL_LOCAL 但忘了配 DB_HOST_LOCAL
-        logger.warning(
-            "[claude_code] DB_HOST_LOCAL 未配置, LOCAL DB 回退到 localhost; "
-            "请确认 .env 里 DB_HOST_LOCAL 是否设置正确"
+def _server_b_url() -> str:
+    """从 .env 读 SERVER_B_URL；缺则抛 RuntimeError（fail-fast，避免静默）"""
+    url = (os.getenv("SERVER_B_URL") or "").rstrip("/")
+    if not url:
+        raise RuntimeError(
+            "未配置 SERVER_B_URL，lobeai 无法委派 Claude Code 兑换给 server_b；"
+            "请在 .env 加 SERVER_B_URL=https://mirror.chat-keeper.com"
         )
-    local_client = NewAPIClient(base_url=local_url, db=local_db)
-    logger.info(
-        f"[claude_code] LOCAL 资源就绪: url={local_url}, "
-        f"db_host={local_db.host}, db_name={local_db.dbname}"
-    )
-    return local_client, local_db
+    return url
 
 
 def _load_claude_models() -> list[str]:
-    """从 data/claude.json 加载 claude 套餐的模型列表"""
+    """从 data/claude.json 加载 claude 套餐的模型列表（透传给 server_b）"""
     path = os.path.join(os.path.dirname(__file__), "..", "data", "claude.json")
     with open(path, "r", encoding="utf-8") as f:
         data = json.load(f)
     return data["claude"]
+
+
+def _call_server_b_redeem(
+    code_id: str,
+    email: str,
+    password: str,
+    quota: int,
+    model_limits: str,
+) -> dict:
+    """HTTP POST server_b /activation/redeem；超时 / 协议失败 → {status: false, ...}
+
+    Returns:
+        业务成功 → {status: True, token_key, name, group, model_limits,
+                   expired_time, quota_added, quota_total, activation_code_id}
+        业务失败 → {status: False, message: "..."}
+    """
+    url = _server_b_url() + "/activation/redeem"
+    payload = {
+        "activation_code_id": code_id,
+        "email": email,
+        "password": password,
+        "quota": int(quota),
+        "model_limits": model_limits,
+        "name_prefix": NAME_PREFIX,
+    }
+    try:
+        resp = requests.post(url, json=payload, timeout=30)
+    except requests.exceptions.Timeout:
+        logger.error(f"[claude_code] server_b 超时: email={email}")
+        return {"status": False, "message": "B 侧兑换超时，请稍后重试"}
+    except requests.exceptions.RequestException as e:
+        logger.error(f"[claude_code] server_b 不可达: {e}, email={email}")
+        return {"status": False, "message": f"B 侧服务不可达: {e}"}
+
+    try:
+        data = resp.json()
+    except Exception as e:
+        logger.error(
+            f"[claude_code] server_b 返回非 JSON: status={resp.status_code}, "
+            f"err={e}, email={email}"
+        )
+        return {"status": False, "message": "B 侧返回格式异常"}
+
+    if resp.status_code >= 400:
+        msg = (
+            data.get("message")
+            or data.get("error")
+            or data.get("detail")
+            or f"HTTP {resp.status_code}"
+        )
+        logger.error(
+            f"[claude_code] server_b HTTP {resp.status_code}: {msg}, email={email}"
+        )
+        return {"status": False, "message": f"B 侧兑换失败: {msg}"}
+
+    if not isinstance(data, dict) or "status" not in data:
+        logger.error(
+            f"[claude_code] server_b 响应缺 status 字段: {data}, email={email}"
+        )
+        return {"status": False, "message": "B 侧响应格式异常"}
+
+    return data
 
 
 def redeem_claude_token_after_validation(
@@ -75,123 +119,66 @@ def redeem_claude_token_after_validation(
     password: str,
     quota: int,
 ) -> dict:
-    """
-    在激活码 random_code 验证通过且 quota>0 后，执行 token 流程 + 标记已使用。
-
-    流程:
-    1. OpenWebUI 登录校验
-    2. 查 tokens WHERE name="Claude Code - {email}" AND deleted_at IS NULL
-       - 存在 → UPDATE remain_quota += quota（继承 key）
-       - 不存在 → create_token（永不过期、三模型白名单、group="claude code"）
-    3. 标记激活码已使用
+    """在激活码 random_code 验证通过且 quota>0 后，委派 server_b 完成 token 操作。
 
     Args:
-        code_id: 已验证的激活码 code_id（用于 mark_as_used）
-        code: 原始激活码（仅做日志/调试用）
-        email: 用户邮箱（同时用于 token name 唯一标识）
-        password: 用户密码（用于 OpenWebUI 登录校验）
-        quota: 从激活码解析出的实际额度单位
-                （生成时已由 GenerateActivationCodes._rmb_to_quota 把 RMB 换算过来，
-                 与 BatchCreateTokens 公式一致: int(price / rate * 500000)）
+        code_id: 已验证的激活码 code_id
+        code:    原始激活码（仅做日志/调试用）
+        email:   用户邮箱
+        password:用户密码（直接透传给 server_b → B 侧 NewAPI /api/user/login）
+        quota:   额度（int）
 
     Returns:
         {"status": True, "token_key": "...", "quota_added": ..., ...} 成功
         {"status": False, "message": "..."} 失败（此时不调用 mark_as_used，激活码仍可用）
+
+    注意：成功后激活码的 mark_as_used 由外层 RandomActivationCode.random_activation_code
+          行 154 统一执行；本函数不再内嵌 mark_as_used，避免重复。
     """
+    if not code_id or not email or not password or not quota or quota <= 0:
+        logger.error(
+            f"[claude_code] 参数非法: code_id={code_id}, email={email}, quota={quota}"
+        )
+        return {"status": False, "message": "兑换参数非法"}
+
     model_list = _load_claude_models()
     model_limits_str = ",".join(model_list)
-    name = f"{NAME_PREFIX}{email}"
 
-    # ── 1) OpenWebUI 登录校验 ──
-    try:
-        get_jwt_token(email, password)
-    except Exception as e:
-        logger.error(f"[claude_code] 用户登录失败: {e}, email={email}")
-        return {"status": False, "message": f"用户登录失败: {e}"}
-
-    # ── 2) token 操作（全部走 LOCAL 实例） ──
-    newapiclient, db = _get_local_claude_clients()
-
-    db.connect()
-    rows = db.execute_query(
-        "SELECT id, key, remain_quota FROM tokens "
-        "WHERE name = %s AND deleted_at IS NULL",
-        (name,),
-    )
-    db.disconnect()
-
-    newapiclient.login()
-    try:
-        if rows:
-            # 2a) 继承 key：累加 remain_quota
-            token_id, token_key, existing_remain = rows[0]
-            new_remain_quota = int(existing_remain or 0) + quota
-            db.connect()
-            db.execute_command(
-                "UPDATE tokens SET remain_quota = %s WHERE id = %s",
-                (new_remain_quota, token_id),
-            )
-            db.disconnect()
-            logger.info(
-                f"[claude_code] 已累加额度到现有 token: id={token_id}, "
-                f"existing={existing_remain} + {quota} = {new_remain_quota}, email={email}"
-            )
-        else:
-            # 2b) 新建 token
-            trail_token = newapiclient.create_token(
-                TokenConfig(
-                    name=name,
-                    remain_quota=quota,
-                    expired_time=-1,                  # 永不过期
-                    unlimited_quota=False,
-                    model_limits_enabled=True,
-                    model_limits=model_limits_str,
-                    group=CLAUDE_PLAN_LEVEL,          # "claude code"
-                )
-            )
-            token_key = trail_token.get("key")
-            new_remain_quota = quota
-            if not token_key or token_key == "***":
-                raise RuntimeError(
-                    f"无法获取有效的 token key: id={trail_token.get('id')}"
-                )
-            logger.info(
-                f"[claude_code] 已新建 Claude Code token: name={name}, "
-                f"quota={quota}, email={email}"
-            )
-    finally:
-        newapiclient.logout()
-
-    # ── 3) 标记激活码已使用（先成功后置；上面失败不会调用这里） ──
-    manager = ActivationCodeManager()
-    manager.mark_as_used(code_id, used_by=email)
     logger.info(
-        f"[claude_code] 用户充值成功: email={email}, "
-        f"quota={quota}, total={new_remain_quota}"
+        f"[claude_code] 委派 server_b: code_id={code_id}, email={email}, quota={quota}"
+    )
+    result = _call_server_b_redeem(
+        code_id=code_id,
+        email=email,
+        password=password,
+        quota=int(quota),
+        model_limits=model_limits_str,
     )
 
-    return {
-        "status": True,
-        "message": "激活成功",
-        "token_key": token_key,
-        "name": name,
-        "group": CLAUDE_PLAN_LEVEL,
-        "model_limits": model_limits_str,
-        "expired_time": -1,
-        "quota_added": quota,
-        "quota_total": new_remain_quota,
-    }
+    if result.get("status"):
+        logger.info(
+            f"[claude_code] 用户充值成功: email={email}, "
+            f"quota_added={result.get('quota_added')}, "
+            f"quota_total={result.get('quota_total')}"
+        )
+    else:
+        logger.warning(
+            f"[claude_code] 兑换失败: email={email}, message={result.get('message')}"
+        )
+
+    return result
 
 
 def redeem_claude_activation_code(code: str, email: str, password: str) -> dict:
-    """
-    兑换 claude_code 激活码（独立完整入口）
+    """兑换 claude_code 激活码（独立完整入口）
 
     流程:
     1. random_code 验证激活码（含签名、DB 匹配、未使用校验）
     2. 校验 plan_level == CLAUDE_PLAN_LEVEL、quota > 0
-    3. 调用 redeem_claude_token_after_validation 执行 token 操作
+    3. 调用 redeem_claude_token_after_validation 执行 token 操作（委派 server_b）
     """
+    from tools.ActivationCodeManager import ActivationCodeManager
+
     manager = ActivationCodeManager()
 
     # 1) 验证激活码 (不标记已使用)
@@ -220,7 +207,7 @@ def redeem_claude_activation_code(code: str, email: str, password: str) -> dict:
         logger.error(f"[claude_code] 激活码 quota 无效: {quota}, email={email}")
         return {"status": False, "message": "激活码额度无效"}
 
-    # 4) token 操作 + mark_as_used
+    # 4) token 操作（成功后才 mark_as_used；mark_as_used 由 RandomActivationCode 外层调）
     return redeem_claude_token_after_validation(
         code_id=code_id,
         code=code,
