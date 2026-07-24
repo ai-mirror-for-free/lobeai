@@ -1,5 +1,5 @@
 """
-claude_code 激活码兑换核心模块（2026-07-23 委派给 server_b）
+claude_code 激活码兑换核心模块（2026-07-23/24 委派给 server_b）
 
 本模块对外暴露两个函数（保持原有签名 + 返回结构不变）：
 - redeem_claude_activation_code(code, email, password) —— 独立完整入口（自己验证激活码）
@@ -7,11 +7,13 @@ claude_code 激活码兑换核心模块（2026-07-23 委派给 server_b）
   —— 仅执行「调 server_b → 拿到 token 字段」，调用方负责 random_code 验证
   用于在 RandomActivationCode 的统一入口里按 plan_level 路由时复用。
 
-设计变更：
-- 不再直连 B 侧 NewAPI / PG；改成调一次 server_b /activation/redeem
-- 鉴权：B 侧 NewAPI 登录账号来自 lobeai 透传的 email + password（两边 NewAPI 账号一致）
-- 失败语义：所有 B 侧失败统一转 {status: false, message: ...}，不触发外层 mark_as_used
-- OpenWebUI 链路（services.OpenWebuiAuth）完全不动；本模块不再调用
+2026-07-24 修订：lobeai → server_b 透传的是 NewAPI 管理员账号（不是用户密码）。
+B 侧 NewAPI 创建 token 必须用管理员账号（NewAPI 设计上不允许用户自建 token；
+B 侧 users 表里至始至终只有管理员自己一个用户；所有 Claude Code key 都是
+管理员创建并归属到管理员账号下）。lobeai 从 .env 的 NEWAPI_USER +
+Fernet 解密 NEWAPI_PASSWORD_ENCRYPTED 得到管理员明文。
+- email 字段只用于给 token 命名（"Claude Code - <email>"）
+- 用户真实性由 lobeai 端的 ActivationCodeManager.random_code + 激活码签名保证
 
 注意: 本模块流程与 RandomActivationCode.random_activation_code 中的套餐码分支互斥，
       但复用同一个 ActivationCodeManager.mark_as_used（外层 RandomActivationCode 行 154
@@ -23,12 +25,18 @@ import os
 import requests
 
 from tools.LoggerManager import LoggerManager
+from tools.password_encryption import get_decrypted_password
 
 logger = LoggerManager(log_file="claude_code_activation.log")
 
 # 与 data/claude.json / 新激活码 payload 共用的常量
 CLAUDE_PLAN_LEVEL = "claude code"     # 激活码 plan_level + NewAPI token group
 NAME_PREFIX = "Claude Code - "        # NewAPI token name 前缀
+
+# admin 凭据 env 名（2026-07-24 改用 ADMIN_USERNAME/ADMIN_PASSWORD_ENCRYPTED，
+# 与 tools.VerifyAdmin.get_admin_client 一致；ENCRYPTION_KEY 通过 SSH 注入进程 env）
+_ADMIN_USER_ENV = "ADMIN_USERNAME"
+_ADMIN_PASSWORD_ENCRYPTED_ENV = "ADMIN_PASSWORD_ENCRYPTED"
 
 
 def _server_b_url() -> str:
@@ -50,25 +58,55 @@ def _load_claude_models() -> list[str]:
     return data["claude"]
 
 
+def _resolve_admin_credentials() -> tuple[str, str]:
+    """从 .env 解析 NewAPI 管理员账号明文
+
+    Returns:
+        (admin_user, admin_password_plain)
+    Raises:
+        RuntimeError 缺凭据时抛
+    """
+    admin_user = os.getenv(_NEWAPI_USER_ENV)
+    admin_password = None
+    try:
+        admin_password = get_decrypted_password(_NEWAPI_PASSWORD_ENCRYPTED_ENV)
+    except Exception as e:
+        raise RuntimeError(
+            f"无法解密 {_NEWAPI_PASSWORD_ENCRYPTED_ENV}，请检查 .env 与 "
+            f"ENCRYPTION_KEY 是否一致: {e}"
+        )
+    if not admin_user or not admin_password:
+        raise RuntimeError(
+            f"lobeai 管理员凭据不完整：{_NEWAPI_USER_ENV} 或 "
+            f"{_NEWAPI_PASSWORD_ENCRYPTED_ENV} 未设置"
+        )
+    return admin_user, admin_password
+
+
 def _call_server_b_redeem(
     code_id: str,
     email: str,
-    password: str,
     quota: int,
     model_limits: str,
 ) -> dict:
     """HTTP POST server_b /activation/redeem；超时 / 协议失败 → {status: false, ...}
+
+    透传给 server_b 的是 lobeai 持有的 NewAPI 管理员账号（不是用户密码）；
+    server_b 用它登录 B 侧 NewAPI 创建/累加属于该 email 的 token。
 
     Returns:
         业务成功 → {status: True, token_key, name, group, model_limits,
                    expired_time, quota_added, quota_total, activation_code_id}
         业务失败 → {status: False, message: "..."}
     """
+    admin_user, admin_password = _resolve_admin_credentials()
+
     url = _server_b_url() + "/activation/redeem"
     payload = {
         "activation_code_id": code_id,
         "email": email,
-        "password": password,
+        "admin_user": admin_user,
+        "admin_password": admin_password,
         "quota": int(quota),
         "model_limits": model_limits,
         "name_prefix": NAME_PREFIX,
@@ -124,8 +162,8 @@ def redeem_claude_token_after_validation(
     Args:
         code_id: 已验证的激活码 code_id
         code:    原始激活码（仅做日志/调试用）
-        email:   用户邮箱
-        password:用户密码（直接透传给 server_b → B 侧 NewAPI /api/user/login）
+        email:   用户邮箱（仅用于命名 token）
+        password:用户密码（Claude 分支不使用，保留仅为了兼容 RandomActivationCode 签名）
         quota:   额度（int）
 
     Returns:
@@ -135,7 +173,7 @@ def redeem_claude_token_after_validation(
     注意：成功后激活码的 mark_as_used 由外层 RandomActivationCode.random_activation_code
           行 154 统一执行；本函数不再内嵌 mark_as_used，避免重复。
     """
-    if not code_id or not email or not password or not quota or quota <= 0:
+    if not code_id or not email or not quota or quota <= 0:
         logger.error(
             f"[claude_code] 参数非法: code_id={code_id}, email={email}, quota={quota}"
         )
@@ -150,7 +188,6 @@ def redeem_claude_token_after_validation(
     result = _call_server_b_redeem(
         code_id=code_id,
         email=email,
-        password=password,
         quota=int(quota),
         model_limits=model_limits_str,
     )
