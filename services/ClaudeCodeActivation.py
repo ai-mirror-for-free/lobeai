@@ -66,19 +66,19 @@ def _resolve_admin_credentials() -> tuple[str, str]:
     Raises:
         RuntimeError 缺凭据时抛
     """
-    admin_user = os.getenv(_NEWAPI_USER_ENV)
+    admin_user = os.getenv(_ADMIN_USER_ENV)
     admin_password = None
     try:
-        admin_password = get_decrypted_password(_NEWAPI_PASSWORD_ENCRYPTED_ENV)
+        admin_password = get_decrypted_password(_ADMIN_PASSWORD_ENCRYPTED_ENV)
     except Exception as e:
         raise RuntimeError(
-            f"无法解密 {_NEWAPI_PASSWORD_ENCRYPTED_ENV}，请检查 .env 与 "
+            f"无法解密 {_ADMIN_PASSWORD_ENCRYPTED_ENV}，请检查 .env 与 "
             f"ENCRYPTION_KEY 是否一致: {e}"
         )
     if not admin_user or not admin_password:
         raise RuntimeError(
-            f"lobeai 管理员凭据不完整：{_NEWAPI_USER_ENV} 或 "
-            f"{_NEWAPI_PASSWORD_ENCRYPTED_ENV} 未设置"
+            f"lobeai 管理员凭据不完整：{_ADMIN_USER_ENV} 或 "
+            f"{_ADMIN_PASSWORD_ENCRYPTED_ENV} 未设置"
         )
     return admin_user, admin_password
 
