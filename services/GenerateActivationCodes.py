@@ -20,7 +20,7 @@ from tools.ActivationCodeManager import (
 
 logger = LoggerManager(log_file="activation_code.log")
 
-# claude_code 套餐的 plan_level（与 data/claude.json key 共用）
+# claude_code 套餐的固定 plan_level
 CLAUDE_PLAN_LEVEL = "claude code"
 # 套餐码允许的天数
 ALLOWED_DAYS = [1, 30, 90]

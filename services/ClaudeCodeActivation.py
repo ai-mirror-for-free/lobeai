@@ -19,7 +19,6 @@ Fernet 解密 NEWAPI_PASSWORD_ENCRYPTED 得到管理员明文。
       但复用同一个 ActivationCodeManager.mark_as_used（外层 RandomActivationCode 行 154
       会在子流程返回 status:true 之后调用；本模块不再内嵌 mark_as_used）。
 """
-import json
 import os
 
 import requests
@@ -29,7 +28,7 @@ from tools.password_encryption import get_decrypted_password
 
 logger = LoggerManager(log_file="claude_code_activation.log")
 
-# 与 data/claude.json / 新激活码 payload 共用的常量
+# Claude Code 激活码与 NewAPI token 共用的常量
 CLAUDE_PLAN_LEVEL = "claude code"     # 激活码 plan_level + NewAPI token group
 NAME_PREFIX = "Claude Code - "        # NewAPI token name 前缀
 
@@ -48,14 +47,6 @@ def _server_b_url() -> str:
             "请在 .env 加 SERVER_B_URL=https://mirror.chat-keeper.com"
         )
     return url
-
-
-def _load_claude_models() -> list[str]:
-    """从 data/claude.json 加载 claude 套餐的模型列表（透传给 server_b）"""
-    path = os.path.join(os.path.dirname(__file__), "..", "data", "claude.json")
-    with open(path, "r", encoding="utf-8") as f:
-        data = json.load(f)
-    return data["claude"]
 
 
 def _resolve_admin_credentials() -> tuple[str, str]:
@@ -87,7 +78,6 @@ def _call_server_b_redeem(
     code_id: str,
     email: str,
     quota: int,
-    model_limits: str,
 ) -> dict:
     """HTTP POST server_b /activation/redeem；超时 / 协议失败 → {status: false, ...}
 
@@ -108,7 +98,6 @@ def _call_server_b_redeem(
         "admin_user": admin_user,
         "admin_password": admin_password,
         "quota": int(quota),
-        "model_limits": model_limits,
         "name_prefix": NAME_PREFIX,
     }
     try:
@@ -179,9 +168,6 @@ def redeem_claude_token_after_validation(
         )
         return {"status": False, "message": "兑换参数非法"}
 
-    model_list = _load_claude_models()
-    model_limits_str = ",".join(model_list)
-
     logger.info(
         f"[claude_code] 委派 server_b: code_id={code_id}, email={email}, quota={quota}"
     )
@@ -189,7 +175,6 @@ def redeem_claude_token_after_validation(
         code_id=code_id,
         email=email,
         quota=int(quota),
-        model_limits=model_limits_str,
     )
 
     if result.get("status"):

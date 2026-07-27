@@ -251,4 +251,4 @@ local_db = NewApiDatabaseManager(
 - `tools/ActivationCodeManager.py` — 激活码的签发/验签/存管
 - `tools/DbScript.py` — `DatabaseManager` / `NewApiDatabaseManager`
 - `tools/GetNewestRate.py` — USD/CNY 汇率（用于 RMB→quota 转换）
-- `data/claude.json` — claude code 套餐的模型白名单
+- Claude Code 新 Token 不设置模型白名单；实际可用模型由 NewAPI 分组和渠道决定
