@@ -8,8 +8,12 @@ import requests
 from dataclasses import dataclass, field
 from typing import Optional
 from dotenv import load_dotenv
+from tools.LoggerManager import LoggerManager
 from tools.password_encryption import get_decrypted_password
 from tools.DbScript import NewApiDatabaseManager  # 多 NewAPI 实例时由调用方显式注入
+
+# 2026-07-31：debug 升级 new-api 鉴权问题，全局 logger 单例
+logger = LoggerManager(log_file="newapi_client.log")
 
 @dataclass
 class TokenConfig:
@@ -83,6 +87,20 @@ class NewAPIClient:
         self.user_id = user_obj.get("id")
         if self.user_id:
             self.session.headers.update({"New-Api-User": str(self.user_id)})
+        # 2026-07-31：升级 new-api 后 /api/token POST 不再信任 session cookie，
+        # 必须显式带 Authorization: Bearer <token>。与 server_b 同根因，详见
+        # 那边 commit 4938ddd；老版 NewAPI 会忽略未知 header，不影响现行流程。
+        auth_token = (
+            user_data.get("token")
+            or user_obj.get("token")
+            or ""
+        )
+        if auth_token:
+            self.session.headers.update({"Authorization": f"Bearer {auth_token}"})
+        logger.info(
+            f"[NewAPIClient] login ok base_url={self.base_url} user_id={self.user_id} "
+            f"has_bearer={'yes' if auth_token else 'no'}"
+        )
         return user_data
 
     def logout(self) -> None:
@@ -218,10 +236,26 @@ class NewAPIClient:
         }
 
         resp = self.session.post(f"{self.base_url}/api/token", json=payload)
-        resp.raise_for_status()
+        if resp.status_code >= 400:
+            # 2026-07-31：升级 new-api 后失败信息仅 message 不够定位，
+            # 把状态码 + body 完整打印，方便一眼看出是 cookie/Bearer/header
+            # 哪一种鉴权缺失。与 server_b 端的日志格式对齐。
+            logger.error(
+                f"[NewAPIClient] create_token http error: status={resp.status_code} "
+                f"body={resp.text[:500]!r} cookies={dict(self.session.cookies)} "
+                f"new_api_user_header={self.session.headers.get('New-Api-User')!r} "
+                f"has_bearer={'yes' if self.session.headers.get('Authorization','').startswith('Bearer ') else 'no'}"
+            )
+            resp.raise_for_status()
         data = resp.json()
 
         if not data.get("success"):
+            logger.error(
+                f"[NewAPIClient] create_token rejected: body={data!r} "
+                f"cookies={dict(self.session.cookies)} "
+                f"new_api_user_header={self.session.headers.get('New-Api-User')!r} "
+                f"has_bearer={'yes' if self.session.headers.get('Authorization','').startswith('Bearer ') else 'no'}"
+            )
             raise RuntimeError(f"创建令牌失败: {data.get('message', '未知错误')}")
 
         # 获取最新创建的令牌

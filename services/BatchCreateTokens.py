@@ -1,6 +1,7 @@
 import json
 import time
 import os
+import requests  # 2026-07-31：捕获 NewAPIClient.create_token 抛的 HTTPError
 from tools.GetNewestRate import get_usd_cny_rate
 from tools.LoadApiConfig import load_api_config
 from tools.LoggerManager import LoggerManager
@@ -100,7 +101,7 @@ def batch_create_tokens(
             created_tokens.append(formatted)
             logger.info(f"已创建令牌 #{i}: {token_name}")
 
-        except RuntimeError as e:
+        except (RuntimeError, requests.exceptions.HTTPError) as e:
             error_msg = f"创建令牌 #{i} ({token_name}) 失败: {e}"
             logger.error(error_msg)
             errors.append(error_msg)
