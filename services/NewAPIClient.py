@@ -78,7 +78,9 @@ class NewAPIClient:
             raise RuntimeError(f"登录失败: {data.get('message', '未知错误')}")
 
         user_data = data.get("data", {})
-        self.user_id = user_data.get("id")
+        # 兼容新版 new-api（嵌套 user 对象）和老版（直接平铺 id/role）
+        user_obj = user_data.get("user") or user_data
+        self.user_id = user_obj.get("id")
         if self.user_id:
             self.session.headers.update({"New-Api-User": str(self.user_id)})
         return user_data

@@ -1,3 +1,4 @@
+import requests
 from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from services.NewAPIClient import NewAPIClient
@@ -52,7 +53,7 @@ async def send_verification_code(request: SendVerificationCodeRequest):
         new_api_client.send_verification_code(email)
         loggre.info("验证码已发送，请检查邮箱")
         return {"message": "验证码已发送，请检查邮箱"}
-    except RuntimeError as e:
+    except (RuntimeError, requests.exceptions.HTTPError) as e:
         loggre.error(f"发送失败: {e}")
         return {"message": f"发送发送失败: {e}"}
 

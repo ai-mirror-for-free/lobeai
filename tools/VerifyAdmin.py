@@ -38,14 +38,17 @@ async def get_admin_client(request: AdminAuthRequest) -> NewAPIClient:
         if not data.get("success"):
             raise HTTPException(status_code=401, detail=data.get("message", "登录失败"))
         user_data = data.get("data", {})
-        user_id = user_data.get("id")
-        user_role = user_data.get("role")
+        # 兼容新版 new-api（嵌套 user 对象）和老版（直接平铺 id/role）
+        user_obj = user_data.get("user") or user_data
+        user_id = user_obj.get("id")
+        user_role = user_obj.get("role")
 
         # 验证是否为管理员
         if user_role != ADMIN_ROLE:
             raise HTTPException(
                 status_code=403,
-                detail=f"权限不足：需要管理员权限（role={ADMIN_ROLE}），当前用户 role={user_role}"
+                detail=f"权限不足：需要管理员权限（role={ADMIN_ROLE}），当前用户 id={user_id} role={user_role}。"
+                   f"若 role 应为 {ADMIN_ROLE} 而显示 None，请检查 new-api 登录响应结构。"
             )
 
         if user_id:
