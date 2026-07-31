@@ -81,7 +81,13 @@ class NewAPIClient:
         # 兼容新版 new-api（嵌套 user 对象）和老版（直接平铺 id/role）
         user_obj = user_data.get("user") or user_data
         self.user_id = user_obj.get("id")
-        if self.user_id:
+        access_token = user_data.get("access_token")
+        if access_token:
+            self.session.headers.update(
+                {"Authorization": f"Bearer {access_token}"}
+            )
+        elif self.user_id:
+            # 兼容老版（无 access_token 回退 New-Api-User header）
             self.session.headers.update({"New-Api-User": str(self.user_id)})
         return user_data
 

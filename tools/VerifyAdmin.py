@@ -51,7 +51,13 @@ async def get_admin_client(request: AdminAuthRequest) -> NewAPIClient:
                    f"若 role 应为 {ADMIN_ROLE} 而显示 None，请检查 new-api 登录响应结构。"
             )
 
-        if user_id:
+        access_token = user_data.get("access_token")
+        if access_token:
+            admin_client.session.headers.update(
+                {"Authorization": f"Bearer {access_token}"}
+            )
+        elif user_id:
+            # 兼容老版（无 access_token 回退 New-Api-User header）
             admin_client.session.headers.update({"New-Api-User": str(user_id)})
         return admin_client
     except HTTPException:
