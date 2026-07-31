@@ -9,7 +9,7 @@
 
 ## 1. 背景
 
-部署了一个独立的 LOCAL NewAPI 实例（`http://192.168.28.13:25142/`，含独立 PG `@192.168.28.2`），专门用于 **claude code 套餐**。其它套餐（default / vip / svip 等）继续走默认 NewAPI，不受影响。
+部署了一个独立的 LOCAL NewAPI 实例（`http://192.168.28.13:25142/`，含独立 PG `@192.168.28.2`），专门用于 **claude code 套餐**。default / vip / svip 等旧 API 套餐已于 2026-07 全量下线（见 `prancy-splashing-goblet` 计划），现在 Claude Code 是 lobeai 唯一面向用户的 token 分发路径。
 
 驱动因素：claude code 套餐是新增的、与默认 NewAPI 隔离的模型白名单+分组，希望 token 数据物理隔离、便于独立运维/计费/审计。
 
@@ -22,9 +22,11 @@
 | `activation_codes` 表 | server A oneapi | `DB_HOST`（默认） | — |
 | `tokens`（claude code 创建的） | local oneapi | `DB_HOST_LOCAL` | `NEWAPI_URL_LOCAL` |
 | `tokens`（其它套餐创建的） | server A oneapi | `DB_HOST`（默认） | `NEWAPI_URL`（默认） |
-| OpenWebUI 登录校验 | openwebui DB | 默认 env | — |
+| `tokens`（group="api" 批量令牌） | server A oneapi | `DB_HOST`（默认） | `NEWAPI_URL`（默认） |
 
 > 关键：用户拿到 claude code 激活码兑换后的 sk-xxx **只能**在 `http://192.168.28.13:25142/` 调，server A 上查不到这条 token（也就 401/404）。这是 by design。
+>
+> 注：原表中的 “OpenWebUI 登录校验 / openwebui DB” 行已移除 —— OpenWebUI 服务已下线，lobeai 不再连接 openwebui DB 或调用 `/api/v1/auths/*`。用户体系当前完全依赖 NewAPI `users` / `users_center` 表。
 
 ---
 
@@ -122,7 +124,7 @@ newapiclient = NewAPIClient()
 newapiclient, db = _get_local_claude_clients()
 ```
 
-其它流程（OpenWebUI 登录、SELECT/UPDATE tokens、create_token、mark_as_used）保持原样。
+其它流程（SELECT/UPDATE tokens、create_token、mark_as_used）保持原样；OpenWebUI 登录已下线，无需再保留。
 
 ---
 
@@ -143,7 +145,7 @@ DB_HOST_LOCAL=192.168.28.2                     # ← 缺这个会回退到 local
 1. **`DatabaseManager` 不自动读 `DB_*_LOCAL` env**：避免全局副作用污染同进程内其它 `NewApiDatabaseManager()` 调用（例如 `ActivationCodeManager`）。
 2. **只有工厂显式传 `db_host`**：调用方明确表达"我要 LOCAL"的意图，env 读取与实际行为解耦。
 3. **`client.db` 与工厂 `db` 共享同一个连接**：这样 `create_token` 内部 `_get_full_token_key_from_db` 也会走 LOCAL DB，能拿到新建 token 的完整 sk-xxx（不会拿到 `"***"`）。
-4. **OpenWebUI 登录保持不动**：与 NewAPI 是两套系统，claude code 用户体系是 OpenWebUI 那一套。
+4. **OpenWebUI 登录已下线**：原 lobeai 的用户体系曾同时依赖 OpenWebUI 登录校验与 NewAPI `users` 表，自 2026-07 起 OpenWebUI 服务已彻底剥离，账号/校验/激活码标记全部由 NewAPI 一侧承担。
 
 ---
 
