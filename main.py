@@ -32,7 +32,7 @@ async def reset_password(request: ResetPasswordRequest, req: Request):
     """
     忘记密码后重置账号
 
-    校验用户名+邮箱后，从 NewAPI 和 OpenWebUI 数据库中删除用户。
+    校验用户名+邮箱后，从 NewAPI 数据库中删除用户。
     IP 限流：每小时 3 次失败尝试，超限封禁 1 天。
     """
     from services.ResetPassword import reset_password as do_reset
@@ -83,13 +83,12 @@ async def register_user(request: RegisterRequest):
 @app.post("/api/random-activation-code")
 async def random_activation_code(request: RandomActivationCodeRequest):
     """
-    激活码兑换接口（统一入口）
+    激活码兑换接口（仅 Claude Code）
 
-    按 plan_level 自动路由:
     - "claude code"  → 创建/累加 NewAPI token "Claude Code - {email}"
                         (三模型白名单, 永不过期, group="claude code")
                         key 存在则累加 remain_quota，不换 key
-    - 其他 plan_level → 调用 buy_package 充值套餐
+    - 其他 plan_level（如历史 default/vip/svip）→ 明确拒绝，且不消耗激活码
     """
     from services.RandomActivationCode import random_activation_code
 
@@ -111,8 +110,8 @@ async def generate_activation_codes(
     admin_client: NewAPIClient = Depends(get_admin_client)
 ):
     """
-    【管理员】批量生成激活码接口
-    tasks: 格式为 [[plan_level, days, count], ...]
+    【管理员】批量生成 Claude Code 激活码接口
+    tasks: 格式为 [["claude code", 0, count, price], ...]，price 为人民币
     """
     from services.GenerateActivationCodes import batch_generate_activation_codes
 
@@ -283,15 +282,13 @@ async def update_user_quota(request: UpdateUserQuotaRequest):
 @app.get("/api/available-models")
 async def get_available_models():
     """
-    获取各套餐的可用模型列表
-    """
-    import json
-    import os
+    历史套餐可用模型列表接口
 
-    pricing_path = os.path.join(os.path.dirname(__file__), "data", "pricing_plan.json")
-    with open(pricing_path, "r", encoding="utf-8") as f:
-        pricing_plan = json.load(f)
-    return pricing_plan
+    套餐体系（default/vip/svip）已下线，本路由保留以兼容既有前端调用，
+    始终返回空对象，前端在遍历渲染时退化为空列表。
+    Claude Code 模型白名单由 server_b 端控制，不在此接口暴露。
+    """
+    return {}
 
 # ==================== 额度查询 ====================
 

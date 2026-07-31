@@ -18,15 +18,6 @@ class RegisterRequest(BaseModel):
     aff_code: Optional[str] = None
 
 
-class BuyPackageRequest(BaseModel):
-    """用户购买新套餐请求"""
-    username: str
-    email: EmailStr
-    password: str
-    plan_level: str
-    days: int
-
-
 class UpdateUserQuotaRequest(BaseModel):
     """查询并更新用户额度请求"""
     username: str
@@ -49,7 +40,7 @@ class GenerateActivationCodesRequest(BaseModel):
     """批量生成激活码请求（仅管理员）"""
     username: str  # 管理员用户名
     password: str  # 管理员密码
-    tasks: list[list] = []  # 格式: [[plan_level, days, count], ...]
+    tasks: list[list] = []  # 格式: [["claude code", 0, count, price], ...]
 
 
 class AdminAuthRequest(BaseModel):
