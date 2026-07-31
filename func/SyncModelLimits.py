@@ -1,25 +1,32 @@
 """
-同步 NewAPI 令牌模型限制和 OpenWebUI 设置
+同步 NewAPI 令牌 (group="api") 的模型限制
 
-当 data/pricing_plan.csv 发生变化后，执行此脚本同步更新：
-1. 从 fill_pricing_plan 获取最新套餐模型列表
-2. 查询 NewAPI 数据库中需要同步的用户令牌
-3. 检查并更新 token 的 model_limits
-4. 同步更新 OpenWebUI 的 settings
+当 data/api.json 发生变化后，执行此脚本同步更新：
+1. 通过 load_api_config 加载最新的 api.json 模型列表
+2. 查询 NewAPI 数据库中 group="api" 的令牌（命名规则 batch-{package}-{ts}-{i}）
+3. 检查并按 api.json + extra_modellist 更新 token 的 model_limits
+
+注意：
+- 套餐体系（default/vip/svip）已下线，OpenWebUI 同步逻辑已移除。
+- Claude Code 令牌 (group="claude code") 继续排除。
+- 旧版 default/vip/svip group 的存量令牌视为历史遗留，名字无法解析为 package 时跳过。
 """
 
 import json
-from tools.DbScript import NewApiDatabaseManager, OpenWebUIDatabaseManager
+import re
+from tools.DbScript import NewApiDatabaseManager
 from tools.LoggerManager import LoggerManager
-from func.PricingProcess import fill_pricing_plan
-from tools.Setting import get_setting
+from tools.LoadApiConfig import load_api_config
+from services.BatchCreateTokens import extra_modellist
 
 logger = LoggerManager(log_file="sync_model_limits.log")
 newapidata = NewApiDatabaseManager()
-openwebuidata = OpenWebUIDatabaseManager()
 
-EXCLUDED_NAME = [""]
-EXCLUDED_GROUP = ["api", "claude code"]
+# 名称规则来自 services/BatchCreateTokens.batch_create_tokens
+BATCH_TOKEN_PATTERN = re.compile(r"^batch-(?P<package>[^-]+)-\d+-\d+$")
+
+# 排除 group
+EXCLUDED_GROUP = ["claude code"]
 
 
 def _get_all_tokens_from_db():
@@ -35,32 +42,15 @@ def _get_all_tokens_from_db():
     return result
 
 
-def _get_user_email_from_token_name(token_name: str) -> str:
+def _parse_package_from_token_name(token_name: str) -> str | None:
     """
-    从令牌名称推导用户邮箱
-    根据 CreaterUsers.py，令牌名称就是用户的 email
+    从令牌名解析 package；不能解析返回 None。
+    命名规则: batch-{package}-{timestamp}-{index}
     """
-    return token_name
-
-
-def _build_openwebui_settings(token_key: str, model_limits: list) -> str:
-    """
-    构建 OpenWebUI settings JSON 字符串
-    参考 CreaterUsers.py 的 settings 格式
-    """
-    setting = get_setting(token_key, model_limits)
-    return json.dumps(setting)
-
-
-def _determine_plan_level(token_name: str, token_group: str) -> str:
-    """
-    根据令牌信息推断套餐级别
-    group 字段对应套餐级别: default, vip, svip, claude code, api 等
-    """
-    if token_group and token_group != "":
-        return token_group
-    # 如果 group 为空，尝试从名称推断（备用逻辑）
-    return "default"
+    m = BATCH_TOKEN_PATTERN.match(token_name or "")
+    if not m:
+        return None
+    return m.group("package")
 
 
 def _parse_model_limits(model_limits_str: str) -> list:
@@ -86,26 +76,15 @@ def _update_token_model_limits(token_id: int, model_limits: str) -> bool:
     return result
 
 
-def _update_openwebui_settings(email: str, settings: str) -> bool:
-    """更新 OpenWebUI 用户设置"""
-    openwebuidata.connect()
-    result = openwebuidata.execute_command(
-        'UPDATE "user" SET settings = %s WHERE email = %s',
-        (settings, email)
-    )
-    openwebuidata.disconnect()
-    return result
-
-
 def sync_model_limits():
     """
     主同步流程
     """
-    # Step 1: 获取最新套餐列表
-    pricing_plan = fill_pricing_plan(True)
-    logger.info(f"加载定价计划: {list(pricing_plan.keys())}")
+    # Step 1: 加载 api.json
+    api_config = load_api_config()
+    logger.info(f"加载 api.json 套餐: {list(api_config.keys())}")
 
-    # Step 2: 查询所有需要同步的令牌
+    # Step 2: 查询所有令牌
     tokens = _get_all_tokens_from_db()
     logger.info(f"从数据库获取到 {len(tokens)} 个令牌")
 
@@ -116,58 +95,47 @@ def sync_model_limits():
         token_id, token_key, token_name, status, remain_quota, \
             unlimited_quota, model_limits_enabled, model_limits, token_group = token_row
 
-        # Step 3: 过滤排除项
-        if token_name in EXCLUDED_NAME:
-            logger.info(f"跳过排除的令牌: {token_name}")
-            skipped_count += 1
-            continue
-        if token_group in EXCLUDED_GROUP:
-            logger.info(f"跳过 {token_group} 分组令牌: {token_name}")
+        # Step 3: 仅处理 group="api" 的令牌
+        if token_group != "api":
+            logger.info(f"跳过非 api 分组令牌 ({token_group}): {token_name}")
             skipped_count += 1
             continue
 
-        # Step 4: 推断套餐级别
-        plan_level = _determine_plan_level(token_name, token_group)
-
-        # 查找对应的套餐列表
-        if plan_level not in pricing_plan:
-            logger.warning(f"令牌 {token_name} 的套餐级别 {plan_level} 不在定价计划中，跳过")
+        # Step 4: 从名称解析 package
+        package = _parse_package_from_token_name(token_name)
+        if package is None:
+            logger.warning(f"无法从名称解析 package，跳过: {token_name}")
+            skipped_count += 1
+            continue
+        if package not in api_config:
+            logger.warning(
+                f"令牌 {token_name} 的 package={package} 不在 api.json 中，跳过"
+            )
             skipped_count += 1
             continue
 
-        expected_models = pricing_plan[plan_level]["modele_list"]
+        # Step 5: 计算期望模型列表 (api.json[package] + extra_modellist)
+        expected_models = list(api_config[package]) + list(extra_modellist)
         current_models = _parse_model_limits(model_limits)
 
-        # Step 5: 检查是否需要更新
         if _list_equals(current_models, expected_models):
-            logger.info(f"令牌 {token_name} (套餐: {plan_level}) 模型列表无需更新")
+            logger.info(f"令牌 {token_name} (package={package}) 模型列表无需更新")
             skipped_count += 1
             continue
 
         logger.info(
-            f"令牌 {token_name} (套餐: {plan_level}) 模型列表不一致，需要更新:"
+            f"令牌 {token_name} (package={package}) 模型列表不一致，需要更新:"
         )
         logger.info(f"  当前: {current_models}")
         logger.info(f"  期望: {expected_models}")
 
-        # Step 6: 更新 NewAPI token model_limits
         new_model_limits = ",".join(expected_models)
         if _update_token_model_limits(token_id, new_model_limits):
             logger.info(f"  -> NewAPI token model_limits 已更新")
+            updated_count += 1
         else:
             logger.error(f"  -> NewAPI token model_limits 更新失败")
-            continue
-
-        # Step 7: 更新 OpenWebUI settings
-        email = _get_user_email_from_token_name(token_name)
-        settings = _build_openwebui_settings(token_key, expected_models)
-        if _update_openwebui_settings(email, settings):
-            logger.info(f"  -> OpenWebUI settings 已更新")
-        else:
-            logger.error(f"  -> OpenWebUI settings 更新失败")
-            continue
-
-        updated_count += 1
+            skipped_count += 1
 
     logger.info(f"同步完成: 更新 {updated_count} 个令牌, 跳过 {skipped_count} 个")
     return {

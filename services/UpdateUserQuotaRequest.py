@@ -17,8 +17,8 @@ def get_user_info(username, email):
     user_key_info = db.execute_query(sql, (email,))
     if not user_key_info:
         # 新用户首次兑换：tokens 表无 name=email 行；
-        # buy_package 后续会 create_token(name=email) 创建第一个 token，
-        # 给个占位值让流程继续即可。expired_time 留 now+30d 让 max() 算得对。
+        # Claude Code token 由 server_b 侧独立创建，默认库 tokens 表可能查不到。
+        # 给个占位值让流程继续即可，expired_time 留 now+30d 让 max() 算得对。
         import time as _t
         user_key_info = [(0, "", 0, int(_t.time()) + 30 * 86400)]
         logger.warning(f"用户无 token 行（首次兑换?），使用占位值: email={email}")

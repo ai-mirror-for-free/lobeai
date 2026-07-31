@@ -97,14 +97,3 @@ class NewApiDatabaseManager(DatabaseManager):
             db_host=db_host, db_port=db_port,
             db_user=db_user, db_password=db_password,
         )
-
-
-class OpenWebUIDatabaseManager(DatabaseManager):
-    """管理 open-webui 数据库的操作类"""
-    def __init__(self, env_path=".env", db_name="openwebui"):
-        super().__init__(env_path, db_name)
-    
-    def get_all_users(self):
-        """获取所有用户"""
-        command = 'select id,name,email,role,settings from "user"'
-        return self.execute_query(command)

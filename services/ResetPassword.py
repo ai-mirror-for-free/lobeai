@@ -1,13 +1,13 @@
 """
 忘记密码后重置账号服务
 
-校验用户名+邮箱后，从 NewAPI 和 OpenWebUI 数据库中删除用户。
+校验用户名+邮箱后，从 NewAPI 数据库中删除用户。
 IP 限流：每小时 3 次失败尝试，超限封禁 1 天。
 """
 import time
 from collections import defaultdict
 from fastapi import Request
-from tools.DbScript import NewApiDatabaseManager, OpenWebUIDatabaseManager
+from tools.DbScript import NewApiDatabaseManager
 from tools.LoggerManager import LoggerManager
 
 # -- IP 限流配置 --
@@ -44,15 +44,16 @@ def reset_password(username: str, email: str, req: Request) -> dict:
     # 清理过期记录
     ip_reset_attempts[ip] = [t for t in ip_reset_attempts[ip] if now - t < RESET_WINDOW]
 
-    # 校验用户名和邮箱
-    openwebui_db = OpenWebUIDatabaseManager()
-    openwebui_db.connect()
-    result = openwebui_db.execute_query(
-        'SELECT id FROM "user" WHERE name = %s AND email = %s', (username, email)
+    # 校验用户名和邮箱（从 NewAPI users 表查询，排除管理员 role=100）
+    newapi_db = NewApiDatabaseManager()
+    newapi_db.connect()
+    result = newapi_db.execute_query(
+        "SELECT id FROM users WHERE username = %s AND email = %s AND role != 100",
+        (username, email),
     )
-    openwebui_db.disconnect()
 
     if not result:
+        newapi_db.disconnect()
         ip_reset_attempts[ip].append(now)
         attempts_left = RESET_LIMIT - len(ip_reset_attempts[ip])
 
@@ -65,17 +66,11 @@ def reset_password(username: str, email: str, req: Request) -> dict:
         logger.info(f"[FAILED] reset-password ip={ip} username={username} attempts_left={attempts_left}")
         return {"message": f"用户名或邮箱不正确，您还有 {attempts_left} 次尝试机会"}
 
-    # 删除用户：NewAPI users 表
-    newapi_db = NewApiDatabaseManager()
-    newapi_db.connect()
-    newapi_db.execute_command("DELETE FROM users WHERE email = %s AND role != 100", (email,))
+    # 校验通过：删除 NewAPI 用户（排除管理员）
+    newapi_db.execute_command(
+        "DELETE FROM users WHERE email = %s AND role != 100", (email,)
+    )
     newapi_db.disconnect()
-
-    # 删除用户：OpenWebUI user 表
-    openwebui_db = OpenWebUIDatabaseManager()
-    openwebui_db.connect()
-    openwebui_db.execute_command('DELETE FROM "user" WHERE email = %s AND role != \'admin\'', (email,))
-    openwebui_db.disconnect()
 
     # 成功后清除该 IP 的失败记录
     ip_reset_attempts.pop(ip, None)
