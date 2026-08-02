@@ -187,9 +187,14 @@ async def get_activation_codes_stats(
     返回每种套餐(plan_level + days)的总数、已使用数量、剩余数量
     """
     from tools.ActivationCodeManager import ActivationCodeManager
+    from services.UpdateUserQuotaRequest import _quota_to_rmb
 
     manager = ActivationCodeManager()
     stats = manager.get_stats_by_plan()
+
+    # 每批激活码面额换算成人民币(保留原 quota 额度,新增 quota_rmb)
+    for s in stats:
+        s["quota_rmb"] = _quota_to_rmb(s.get("quota"))
 
     # 计算汇总
     total_all = sum(s["total"] for s in stats)
