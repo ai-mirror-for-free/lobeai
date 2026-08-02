@@ -1,69 +1,108 @@
-from datetime import datetime
+"""
+update-user-quota 主数据聚合口（给别的项目用，只读）
+
+数据来源：
+- 剩余余额：直连 server_b /billing/balance?email= → remain_quota → 人民币
+- 累计充值：lobeai 自己库 activation_codes WHERE used_by=email 的 SUM(quota) → 人民币
+换算公式：RMB = quota × usd_cny_rate / 500000（与 claude_agent / 兑换链路一致）
+
+返回全人民币，不再写 users_center（原 days_left / quota_left 写入已废弃）。
+"""
 from tools.LoggerManager import LoggerManager
+from tools.GetNewestRate import get_usd_cny_rate
 from tools.DbScript import NewApiDatabaseManager
 
 logger = LoggerManager()
-db = NewApiDatabaseManager()
+
+# NewAPI 额度换算单位：500000 quota = 1 USD
+QUOTA_TO_USD = 500000
+
+
+def _server_b_balance(email: str) -> dict:
+    """直连 server_b /billing/balance，拿 Claude Code token 的剩余额度
+
+    Returns:
+        dict（可能含 remain_quota / unlimited / has_key）；调用失败返回 {}
+    """
+    import requests
+    from services.ClaudeCodeActivation import _server_b_url
+
+    url = _server_b_url() + "/billing/balance"
+    try:
+        resp = requests.get(url, params={"email": email}, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+        return data if isinstance(data, dict) else {}
+    except Exception as e:
+        logger.error(f"[update-user-quota] server_b /billing/balance 失败: {e}, email={email}")
+        return {}
+
+
+def _total_recharged_quota(email: str) -> int:
+    """累计充值额度：lobeai 自己库 activation_codes 对应用户已兑换 quota 求和"""
+    db = NewApiDatabaseManager()
+    db.connect()
+    try:
+        rows = db.execute_query(
+            "SELECT COALESCE(SUM(quota), 0) FROM activation_codes WHERE used_by = %s",
+            (email,),
+        )
+        if rows and rows[0] and rows[0][0] is not None:
+            return int(rows[0][0])
+        return 0
+    except Exception as e:
+        logger.error(f"[update-user-quota] activation_codes 累计充值查询失败: {e}, email={email}")
+        return 0
+    finally:
+        db.disconnect()
+
+
+def _quota_to_rmb(quota) -> float:
+    """NewAPI 额度 → 人民币"""
+    if not quota:
+        return 0.0
+    try:
+        rate, _ = get_usd_cny_rate()
+        return round(float(quota) / QUOTA_TO_USD * rate, 2)
+    except Exception as e:
+        logger.error(f"[update-user-quota] 汇率换算失败: {e}, quota={quota}")
+        return 0.0
 
 
 def get_user_info(username, email):
     """
-    获取用户信息
-    :param email:
-    :return:
+    查询用户额度（人民币，只读）
+
+    Returns:
+        {
+            "email": ...,
+            "currency": "CNY",
+            "balance": float,          # 剩余可用余额 ¥（unlimited 时为 0.0，看 unlimited 标志）
+            "total_recharged": float,  # 累计充值 ¥
+            "unlimited": bool,
+            "has_key": bool,
+        }
     """
-    db.connect()
-    sql = "select remain_quota,model_limits,used_quota,expired_time from tokens where name = %s and deleted_at is null"
-    user_key_info = db.execute_query(sql, (email,))
-    if not user_key_info:
-        # 新用户首次兑换：tokens 表无 name=email 行；
-        # Claude Code token 由 server_b 侧独立创建，默认库 tokens 表可能查不到。
-        # 给个占位值让流程继续即可，expired_time 留 now+30d 让 max() 算得对。
-        import time as _t
-        user_key_info = [(0, "", 0, int(_t.time()) + 30 * 86400)]
-        logger.warning(f"用户无 token 行（首次兑换?），使用占位值: email={email}")
-    user_key_info = user_key_info[0]
-    """
-    remain_quota:剩余额度
-    model_limits:模型限制
-    used_quota:已使用额度
-    expired_time:到期时间
-    """
-    user_key_info = {
-        "remain_quota": user_key_info[0],
-        "model_limits": user_key_info[1],
-        "used_quota": user_key_info[2],
-        "expired_time": user_key_info[3],
+    b = _server_b_balance(email)
+    remain = b.get("remain_quota")
+    unlimited = bool(b.get("unlimited"))
+    has_key = bool(b.get("has_key"))
+
+    # 剩余余额：unlimited 或拿不到 remain 时余额按 0，由 unlimited 标志区分
+    if not unlimited and remain is not None:
+        balance = _quota_to_rmb(remain)
+    else:
+        balance = 0.0
+
+    total_recharged = _quota_to_rmb(_total_recharged_quota(email))
+
+    result = {
+        "email": email,
+        "currency": "CNY",
+        "balance": balance,
+        "total_recharged": total_recharged,
+        "unlimited": unlimited,
+        "has_key": has_key,
     }
-    # email 是唯一判定键
-    sql = "select plan_level, name from users_center where email = %s"
-    rows = db.execute_query(sql, (email,))
-    if not rows:
-        logger.error(f"未找到 users_center 记录: email={email}")
-        db.disconnect()
-        return None
-    plan_level, stored_name = rows[0]
-    user_key_info["plan_level"] = plan_level
-
-    # 如果用户名变了，同步到 users_center（email 是唯一判定，按 email 匹配）
-    if stored_name != username:
-        logger.info(
-            f"users_center.name 变更: {stored_name} -> {username}, email={email}"
-        )
-        db.execute_command(
-            "update users_center set name = %s where email = %s",
-            (username, email),
-        )
-
-    # 更新用户中心 剩余时间，套餐余额
-    update_sql = "update users_center set days_left = %s, quota_left = %s where email = %s"
-    db.execute_command(
-        update_sql,
-        (
-            user_key_info["expired_time"],
-            user_key_info["remain_quota"],
-            email,
-        ),
-    )
-    db.disconnect()
-    return user_key_info
+    logger.info(f"[update-user-quota] result email={email} → {result}")
+    return result
