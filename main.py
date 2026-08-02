@@ -211,6 +211,21 @@ async def get_activation_codes_stats(
     }
 
 
+@app.post("/api/admin/usage-summary")
+async def usage_summary(
+    request: UsageSummaryRequest,
+    admin_client: NewAPIClient = Depends(get_admin_client),
+):
+    """
+    【管理员】平台套餐用量统计
+    统计全部套餐(api / claude code)的累计充值 + 累计消耗，人民币口径。
+    granularity: ""(只累计) | "month"(按自然月) | "week"(按自然周)
+    """
+    from services.UsageSummary import get_usage_summary
+
+    return get_usage_summary(granularity=request.granularity)
+
+
 @app.post("/api/admin/price")
 async def price_query_page(
     request: AdminAuthRequest,

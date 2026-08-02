@@ -90,6 +90,13 @@ class QuotaQueryRequest(BaseModel):
     token: str  # 用户 token (sk-xxx)
 
 
+class UsageSummaryRequest(BaseModel):
+    """平台套餐用量统计请求（仅管理员）"""
+    username: str        # 管理员用户名
+    password: str        # 管理员密码
+    granularity: str = ""  # 分桶粒度: ""(只累计) | "month" | "week"
+
+
 class ExperienceRequest(BaseModel):
     """体验接口请求"""
     key: str    # 用户 API key (sk-xxx)
