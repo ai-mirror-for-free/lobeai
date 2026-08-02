@@ -1,3 +1,5 @@
+from typing import AsyncIterator
+
 from services.NewAPIClient import NewAPIClient
 from fastapi import HTTPException, Depends
 from tools.RequestVaild import AdminAuthRequest
@@ -6,9 +8,9 @@ from tools.RequestVaild import AdminAuthRequest
 ADMIN_ROLE = 100
 
 
-async def get_admin_client(request: AdminAuthRequest) -> NewAPIClient:
+async def get_admin_client(request: AdminAuthRequest) -> AsyncIterator[NewAPIClient]:
     """
-    FastAPI 依赖函数：验证管理员身份并返回已认证的 NewAPIClient 实例
+    FastAPI 生成器依赖：验证管理员身份并返回已认证的 NewAPIClient 实例
 
     用法:
         @app.post("/api/admin/...")
@@ -16,11 +18,14 @@ async def get_admin_client(request: AdminAuthRequest) -> NewAPIClient:
             # 直接使用 admin_client
             ...
 
+    响应处理结束后，finally 会自动调用 admin_client.logout() 撤销本次管理登录
+    在 new-api 上创建的会话，避免反复登录累积 active session 触发 AUTH_SESSION_LIMIT。
+
     Args:
         request: 包含 username 和 password 的请求体
 
-    Returns:
-        已登录的 NewAPIClient 实例
+    Yields:
+        已登录的 NewAPIClient 实例（供端点使用）
 
     Raises:
         HTTPException: 非管理员用户或认证失败时抛出
@@ -59,8 +64,18 @@ async def get_admin_client(request: AdminAuthRequest) -> NewAPIClient:
         elif user_id:
             # 兼容老版（无 access_token 回退 New-Api-User header）
             admin_client.session.headers.update({"New-Api-User": str(user_id)})
-        return admin_client
+
+        # 对外提供使用；依赖解析结束后由 finally 登出
+        yield admin_client
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=401, detail=f"管理员认证失败: {e}")
+    finally:
+        # 撤销本次管理登录在 new-api 上创建的会话，避免反复登录累积到 AUTH_SESSION_LIMIT
+        # （HTTP 409 Conflict）。admin_client 带登录时的 Authorization/New-Api-User 头，
+        # /api/user/logout 据此撤销会话。
+        try:
+            admin_client.logout()
+        except Exception:
+            pass
