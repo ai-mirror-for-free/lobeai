@@ -91,6 +91,37 @@ class NewAPIClient:
             self.session.headers.update({"New-Api-User": str(self.user_id)})
         return user_data
 
+    def refresh_login(self) -> bool:
+        """刷新登录会话（access_token 15 分钟过期，用 refresh cookie 换新）
+
+        new-api 刷新接口: POST /api/user/auth/refresh，session 自动携带
+        new_api_refresh cookie，Set-Cookie 会更新 refresh cookie 实现轮换。
+
+        Returns:
+            True  刷新成功（已更新 Authorization 头）
+            False 刷新失败（调用方应 fallback 重新 login）
+        """
+        try:
+            resp = self.session.post(
+                f"{self.base_url}/api/user/auth/refresh",
+                timeout=15,
+            )
+            if resp.status_code != 200:
+                return False
+            data = resp.json()
+            if not data.get("success"):
+                return False
+            user_data = data.get("data", {})
+            access_token = user_data.get("access_token")
+            if not access_token:
+                return False
+            self.session.headers.update(
+                {"Authorization": f"Bearer {access_token}"}
+            )
+            return True
+        except Exception:
+            return False
+
     def logout(self) -> None:
         """登出并清除 Session"""
         self.session.get(f"{self.base_url}/api/user/logout")
