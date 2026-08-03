@@ -4,7 +4,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from services.NewAPIClient import NewAPIClient
 from tools.LoggerManager import LoggerManager
 from tools.RequestVaild import *
-from tools.VerifyAdmin import get_admin_client
+from tools.VerifyAdmin import get_admin_client, _check_admin_credentials
+from tools.AdminTokenManager import issue_token, TOKEN_TTL
 from middleware.ProtectionMiddleware import ProtectionMiddleware
 
 # 初始化 FastAPI 应用
@@ -102,6 +103,31 @@ async def random_activation_code(request: RandomActivationCodeRequest):
 
 
 # ==================== 管理员接口 ====================
+
+
+@app.post("/api/admin/login")
+async def admin_login(request: AdminLoginRequest):
+    """
+    【管理员】登录换取 lobeai token
+
+    账密本地比对（NEWAPI_USER + 解密密码），不向 new-api 发起登录，
+    因此不产生任何 new-api 会话。token 有效期 24 小时。
+    """
+    import time
+
+    if not _check_admin_credentials(request.username, request.password):
+        raise HTTPException(status_code=401, detail="登录失败")
+
+    token = issue_token(request.username)
+    return {
+        "success": True,
+        "data": {
+            "token": token,
+            "token_type": "Bearer",
+            "expires_at": int(time.time()) + TOKEN_TTL,
+            "expires_in": TOKEN_TTL,
+        },
+    }
 
 
 @app.post("/api/admin/generate-activation-codes")
