@@ -75,11 +75,11 @@ def _api_stats(db, granularity: str) -> dict:
     total_recharged = _query_total(
         db,
         "SELECT COALESCE(SUM(remain_quota + used_quota), 0) FROM tokens "
-        "WHERE group = 'api' AND deleted_at IS NULL",
+        'WHERE "group" = \'api\' AND deleted_at IS NULL',
     )
     total_consumed = _query_total(
         db,
-        "SELECT COALESCE(SUM(quota), 0) FROM logs WHERE group = 'api'",
+        'SELECT COALESCE(SUM(quota), 0) FROM logs WHERE "group" = \'api\'',
     )
 
     bucket_expr = _BUCKET_EXPR.get(granularity)
@@ -90,12 +90,12 @@ def _api_stats(db, granularity: str) -> dict:
             db,
             f"SELECT {bucket_expr.format(ts='to_timestamp(created_time)')}, "
             f"COALESCE(SUM(remain_quota + used_quota), 0) FROM tokens "
-            f"WHERE group = 'api' AND deleted_at IS NULL GROUP BY 1 ORDER BY 1",
+            f'WHERE "group" = \'api\' AND deleted_at IS NULL GROUP BY 1 ORDER BY 1',
         )
         consumed_buckets = _query_buckets(
             db,
             f"SELECT {bucket_expr.format(ts='to_timestamp(created_at)')}, "
-            f"COALESCE(SUM(quota), 0) FROM logs WHERE group = 'api' "
+            f'COALESCE(SUM(quota), 0) FROM logs WHERE "group" = \'api\' '
             f"GROUP BY 1 ORDER BY 1",
         )
 
