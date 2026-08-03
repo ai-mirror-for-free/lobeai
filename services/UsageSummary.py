@@ -215,22 +215,23 @@ def get_usage_summary(granularity: str = "") -> dict:
     }
 
     # 合并各数据源分桶：recharged = api充值 + cc充值；consumed = api消耗 + cc消耗
+    # 先取整后求和：每个数据源分桶各自换算成人民币取整后，再按桶相加
     if granularity in ("month", "week"):
         merged = {}
         for src in (api, cc):
             for bk, quota in src["recharged_buckets"].items():
                 merged.setdefault(bk, {"recharged": 0, "consumed": 0})
-                merged[bk]["recharged"] += quota
+                merged[bk]["recharged"] += round(_quota_to_rmb(quota))
             for bk, quota in src["consumed_buckets"].items():
                 merged.setdefault(bk, {"recharged": 0, "consumed": 0})
-                merged[bk]["consumed"] += quota
+                merged[bk]["consumed"] += round(_quota_to_rmb(quota))
 
         key = "by_month" if granularity == "month" else "by_week"
         result[key] = [
             {
                 "bucket": bk,
-                "recharged": round(_quota_to_rmb(v["recharged"])),
-                "consumed": round(_quota_to_rmb(v["consumed"])),
+                "recharged": v["recharged"],
+                "consumed": v["consumed"],
             }
             for bk, v in sorted(merged.items())
         ]
