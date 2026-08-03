@@ -38,27 +38,34 @@ class RandomActivationCodeRequest(BaseModel):
 
 class GenerateActivationCodesRequest(BaseModel):
     """批量生成激活码请求（仅管理员）"""
-    username: str  # 管理员用户名
-    password: str  # 管理员密码
+    username: Optional[str] = None  # 管理员用户名
+    password: Optional[str] = None  # 管理员密码
     tasks: list[list] = []  # 格式: [["claude code", 0, count, price], ...]
 
 
 class AdminAuthRequest(BaseModel):
     """管理员认证请求（通用）"""
+    username: Optional[str] = None   # 管理员用户名（方式二账密兼容）
+    password: Optional[str] = None   # 管理员密码（方式二账密兼容）
+    token: Optional[str] = None      # lobeai 登录接口签发的 token（方式一）
+
+
+class AdminLoginRequest(BaseModel):
+    """管理员登录请求（换取 token）"""
     username: str  # 管理员用户名
     password: str  # 管理员密码
 
 
 class ActivationCodeStatsRequest(BaseModel):
     """激活码统计查询请求"""
-    username: str  # 管理员用户名
-    password: str  # 管理员密码
+    username: Optional[str] = None
+    password: Optional[str] = None
 
 
 class AdminOpenRouterSearchRequest(BaseModel):
     """管理员搜索 OpenRouter 模型请求"""
-    username: str  # 管理员用户名
-    password: str  # 管理员密码
+    username: Optional[str] = None
+    password: Optional[str] = None
     q: str  # 搜索的模型名称
 
 
@@ -70,16 +77,16 @@ class ResetPasswordRequest(BaseModel):
 
 class AdminTextUpdateRequest(BaseModel):
     """管理员更新文本请求"""
-    username: str  # 管理员用户名
-    password: str  # 管理员密码
+    username: Optional[str] = None
+    password: Optional[str] = None
     key: str  # 文本的 key
     content: str  # 文本内容
 
 
 class BatchCreateTokensRequest(BaseModel):
     """批量创建 NewAPI 令牌请求（仅管理员）"""
-    username: str                               # 管理员用户名
-    password: str                               # 管理员密码
+    username: Optional[str] = None
+    password: Optional[str] = None
     n: int = Field(..., gt=0, le=100)           # 创建数量
     package: str                                # 套餐类型 (claude/openai/gemini/image)
     price: float = Field(..., gt=0)             # 总价（人民币，额度计算时会转换为美元）
@@ -92,8 +99,8 @@ class QuotaQueryRequest(BaseModel):
 
 class UsageSummaryRequest(BaseModel):
     """平台套餐用量统计请求（仅管理员）"""
-    username: str        # 管理员用户名
-    password: str        # 管理员密码
+    username: Optional[str] = None
+    password: Optional[str] = None
     granularity: str = ""  # 分桶粒度: ""(只累计) | "month" | "week"
 
 
