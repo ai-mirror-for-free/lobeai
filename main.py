@@ -210,25 +210,51 @@ async def get_activation_codes_stats(
 ):
     """
     【管理员】查询激活码统计信息
-    返回每种套餐(plan_level + days)的总数、已使用数量、剩余数量
+    返回每种套餐(plan_level + days + 取整价格)的总数、已使用数量、剩余数量。
+    汇率波动导致同一取整价格下原始 quota 有微小差异的多批激活码合并为一行,
+    额度列显示该组内任意一个原始 quota。
     """
+    from collections import defaultdict
     from tools.ActivationCodeManager import ActivationCodeManager
     from services.UpdateUserQuotaRequest import _quota_to_rmb
 
     manager = ActivationCodeManager()
     stats = manager.get_stats_by_plan()
 
-    # 每批激活码面额换算成人民币(保留原 quota 额度,新增 quota_rmb,面额取整)
+    # 按取整后的面额重新分组: 同一 (plan_level, days, 取整价格) 视为同一批次
+    groups = defaultdict(
+        lambda: {"quota": None, "quota_rmb": 0, "total": 0, "used": 0, "available": 0}
+    )
     for s in stats:
-        s["quota_rmb"] = round(_quota_to_rmb(s.get("quota")))
+        rmb = round(_quota_to_rmb(s.get("quota")))
+        g = groups[(s["plan_level"], s["days"], rmb)]
+        g["quota_rmb"] = rmb
+        if g["quota"] is None:
+            g["quota"] = s["quota"]
+        g["total"] += s["total"]
+        g["used"] += s["used"]
+        g["available"] += s["available"]
+
+    merged_stats = [
+        {
+            "plan_level": k[0],
+            "days": k[1],
+            "quota": g["quota"] or 0,
+            "quota_rmb": g["quota_rmb"],
+            "total": g["total"],
+            "used": g["used"],
+            "available": g["available"],
+        }
+        for k, g in sorted(groups.items())
+    ]
 
     # 计算汇总
-    total_all = sum(s["total"] for s in stats)
-    used_all = sum(s["used"] for s in stats)
-    available_all = sum(s["available"] for s in stats)
+    total_all = sum(s["total"] for s in merged_stats)
+    used_all = sum(s["used"] for s in merged_stats)
+    available_all = sum(s["available"] for s in merged_stats)
 
     return {
-        "stats": stats,
+        "stats": merged_stats,
         "summary": {
             "total": total_all,
             "used": used_all,
