@@ -193,13 +193,13 @@ def get_usage_summary(granularity: str = "") -> dict:
     by_plan = [
         {
             "type": API,
-            "total_recharged": _quota_to_rmb(api["total_recharged"]),
-            "total_consumed": _quota_to_rmb(api["total_consumed"]),
+            "total_recharged": round(_quota_to_rmb(api["total_recharged"])),
+            "total_consumed": round(_quota_to_rmb(api["total_consumed"])),
         },
         {
             "type": CLAUDE_CODE,
-            "total_recharged": _quota_to_rmb(cc["total_recharged"]),
-            "total_consumed": _quota_to_rmb(cc["total_consumed"]),
+            "total_recharged": round(_quota_to_rmb(cc["total_recharged"])),
+            "total_consumed": round(_quota_to_rmb(cc["total_consumed"])),
         },
     ]
 
@@ -207,9 +207,9 @@ def get_usage_summary(granularity: str = "") -> dict:
         "currency": "CNY",
         "summary": {
             "total_recharged": round(
-                sum(p["total_recharged"] for p in by_plan), 2
+                sum(p["total_recharged"] for p in by_plan)
             ),
-            "total_consumed": round(sum(p["total_consumed"] for p in by_plan), 2),
+            "total_consumed": round(sum(p["total_consumed"] for p in by_plan)),
         },
         "by_plan": by_plan,
     }
@@ -229,8 +229,8 @@ def get_usage_summary(granularity: str = "") -> dict:
         result[key] = [
             {
                 "bucket": bk,
-                "recharged": _quota_to_rmb(v["recharged"]),
-                "consumed": _quota_to_rmb(v["consumed"]),
+                "recharged": round(_quota_to_rmb(v["recharged"])),
+                "consumed": round(_quota_to_rmb(v["consumed"])),
             }
             for bk, v in sorted(merged.items())
         ]
