@@ -15,19 +15,25 @@ ADMIN_ROLE = 100
 
 
 def _check_admin_credentials(username, password) -> bool:
-    """本地比对管理员账密（NEWAPI_USER + 解密后的密码）
+    """本地比对管理员账密
 
-    管理员账号即 lobeai 配置的管理员，本地比对即完成身份校验，
-    不向 new-api 发起登录，因此不产生任何 new-api 会话。
+    管理员标识同时接受 username 或 email（分别取 NEWAPI_USER / ADMIN_USERNAME
+    / ADMIN_EMAIL），密码统一用解密后的 NEWAPI_PASSWORD_ENCRYPTED 比对。
+    本地比对即完成身份校验，不向 new-api 发起登录，不产生任何 new-api 会话。
     """
     if not username or not password:
         return False
     try:
-        expected_user = os.environ.get("NEWAPI_USER", "")
+        expected_names = {
+            os.environ.get("NEWAPI_USER", ""),
+            os.environ.get("ADMIN_USERNAME", ""),
+            os.environ.get("ADMIN_EMAIL", ""),
+        }
+        expected_names.discard("")
         expected_pass = get_decrypted_password("NEWAPI_PASSWORD_ENCRYPTED")
     except Exception:
         return False
-    return username == expected_user and password == expected_pass
+    return username in expected_names and password == expected_pass
 
 
 def _extract_bearer_token(request: Request) -> str:
