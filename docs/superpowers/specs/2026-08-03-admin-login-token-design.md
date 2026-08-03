@@ -64,7 +64,7 @@ lobeai get_admin_client ──本地校验──→ SharedAdminSession（唯一�
 | `tools/SharedAdminSession.py`（新增） | 全局共享管理员会话（单例 + 自动 refresh） |
 | `services/NewAPIClient.py` | 新增 `refresh_login()` 方法 |
 | `tools/VerifyAdmin.py` | 改造 `get_admin_client`：token / 账密两种认证，均返回共享会话 |
-| `tools/RequestVaild.py` | 新增 `AdminLoginRequest`；`AdminAuthRequest` 增可选 `token: str = ""` |
+| `tools/RequestVaild.py` | 新增 `AdminLoginRequest`；各管理接口模型 `username/password` 放宽为 `Optional`（兼容纯 token 调用） |
 
 ## 4. 详细设计
 
@@ -154,9 +154,10 @@ Content-Type: application/json
 
 - 移除原 finally 中的 `logout()`——共享会话不能登出。
 - 移除原逻辑中"向 new-api 登录验证 role==100"的步骤——身份校验改为本地账密比对，不再产生 new-api 会话。管理员角色信任基于配置（lobeai 配置的管理员即 new-api 管理员）。
-- 依赖函数签名：`async def get_admin_client(creds: AdminAuthRequest, request: Request) -> AsyncIterator[NewAPIClient]`。
-  - `creds: AdminAuthRequest`：从请求体解析（`AdminAuthRequest` 在原有 `username/password` 基础上**增加可选 `token: str = ""`**）。各具体接口的 Request 模型（`UsageSummaryRequest` 等）与它字段兼容——FastAPI 对依赖的 body 模型与端点的 body 模型做并集合并解析，多出的 `token` 字段在端点模型上被忽略，不影响现有接口。
-  - `request: Request`：Starlette 原始请求，用于读取 `Authorization: Bearer <token>` 头。
+- 依赖函数签名：`async def get_admin_client(request: Request) -> AsyncIterator[NewAPIClient]`。
+  - **只接收 Starlette `Request`，手动解析 body 与 header**，不再声明 body 模型参数。原因：若依赖同时声明 body 模型（如 `AdminAuthRequest`），FastAPI 会将依赖参数与端点自身的 body 模型（`UsageSummaryRequest` 等）视为两个独立 body 参数，要求请求体嵌套结构（`{"creds": {...}}`），导致扁平请求体 422。改为手动 `await request.json()` 解析后，端点 body 模型正常解析，认证参数从 body dict 中读取。
+  - token 来源：`Authorization: Bearer <token>` 头（优先）或 body 的 `token` 字段。
+  - 账密来源：body 的 `username` / `password` 字段（本地比对，兼容老对接方）。
   - `main.py` 中所有 `Depends(get_admin_client)` 用法不变。
 
 ### 4.6 main.py 管理接口改造

@@ -338,12 +338,15 @@ git commit -m "refactor: 管理接口账密放宽为可选支持token" --no-veri
 - Modify: `lobeai/tools/VerifyAdmin.py`
 
 **Interfaces:**
-- Consumes: `AdminAuthRequest`、`AdminTokenManager.verify_token`、`SharedAdminSession.get_admin_client`、`get_decrypted_password("NEWAPI_PASSWORD_ENCRYPTED")`、`os.environ["NEWAPI_USER"]`
-- Produces: `get_admin_client(request: Request, creds: AdminAuthRequest) -> AsyncIterator[NewAPIClient]`（FastAPI 依赖，两种凭证路径均返回共享会话）
+- Consumes: `AdminTokenManager.verify_token`、`SharedAdminSession.get_admin_client`、`get_decrypted_password("NEWAPI_PASSWORD_ENCRYPTED")`、`os.environ["NEWAPI_USER"]`
+- Produces: `get_admin_client(request: Request) -> AsyncIterator[NewAPIClient]`（FastAPI 依赖，只接收 Starlette Request 手动解析 body/header，两种凭证路径均返回共享会话）
+
+> **实现要点（与初版方案不同）**：依赖函数**不声明 body 模型参数**，只接收 `request: Request`，内部 `await request.json()` 手动解析。原因：若依赖同时声明 body 模型，FastAPI 会把依赖参数与端点 body 模型（如 `UsageSummaryRequest`）当作两个独立 body 参数，要求请求体嵌套结构，导致扁平请求体 422。手动解析后端点 body 模型正常解析，认证字段从 body dict 中读取。
 
 - [ ] **Step 1: 整体重写 VerifyAdmin.py**
 
 ```python
+import json
 import os
 from typing import AsyncIterator
 
@@ -359,7 +362,7 @@ from tools.password_encryption import get_decrypted_password
 ADMIN_ROLE = 100
 
 
-def _check_admin_credentials(username: str, password: str) -> bool:
+def _check_admin_credentials(username, password) -> bool:
     """本地比对管理员账密（NEWAPI_USER + 解密后的密码）
 
     管理员账号即 lobeai 配置的管理员，本地比对即完成身份校验，
@@ -383,7 +386,18 @@ def _extract_bearer_token(request: Request) -> str:
     return ""
 
 
-async def get_admin_client(request: Request, creds: AdminAuthRequest) -> AsyncIterator[NewAPIClient]:
+async def _extract_body_json(request: Request) -> dict:
+    """读取请求体 JSON（幂等，失败返回空 dict）"""
+    try:
+        raw = await request.body()
+        if not raw:
+            return {}
+        return json.loads(raw) if isinstance(raw, (bytes, str)) else {}
+    except Exception:
+        return {}
+
+
+async def get_admin_client(request: Request) -> AsyncIterator[NewAPIClient]:
     """FastAPI 依赖：验证管理员身份并返回共享管理员会话
 
     凭证优先级（三选一）：
@@ -393,13 +407,17 @@ async def get_admin_client(request: Request, creds: AdminAuthRequest) -> AsyncIt
 
     认证通过后返回 SharedAdminSession 的全局共享客户端（不登出，
     生命周期与进程一致），保证 new-api 上管理员活跃会话恒为 1。
+
+    注意：本依赖只接收 Starlette Request，手动解析 body，避免与端点自身
+    的 body 模型（如 UsageSummaryRequest）在 FastAPI 解析时冲突。
     """
-    token = _extract_bearer_token(request) or (creds.token or "")
+    body = await _extract_body_json(request)
+    token = _extract_bearer_token(request) or body.get("token") or ""
     if token:
         entry = await run_in_threadpool(verify_token, token)
         if entry is None:
             raise HTTPException(status_code=401, detail="token invalid or expired")
-    elif not _check_admin_credentials(creds.username, creds.password):
+    elif not _check_admin_credentials(body.get("username"), body.get("password")):
         raise HTTPException(status_code=401, detail="管理员认证失败")
 
     try:
@@ -534,5 +552,8 @@ Expected: 连续多次调用后该计数保持为 1（或接近 1，不含历史
 
 - **Spec 覆盖**：login 接口 → Task 6；token 管理 → Task 1；共享会话 → Task 2+3；get_admin_client 双认证 → Task 5；模型放宽（支持纯 header token）→ Task 4；兼容路径 → Task 5 账密分支；验证 → Task 7。全部覆盖。
 - **占位符**：无 TBD/TODO；每步含完整代码/命令。
-- **类型一致性**：`issue_token`/`verify_token`/`refresh_login`/`get_admin_client`（SharedAdminSession 与 VerifyAdmin 中同名函数有清晰区分）签名在 Task 间一致。`AdminAuthRequest` 在 Task 4 定义、Task 5 消费，字段一致。
+- **类型一致性**：`issue_token`/`verify_token`/`refresh_login`/`get_admin_client`（SharedAdminSession 与 VerifyAdmin 中同名函数有清晰区分）签名在 Task 间一致。`get_admin_client` 最终实现为只接收 `request: Request` 手动解析 body（见 Task 5 实现要点）。
 - **注意**：`get_admin_client` 在 `tools/VerifyAdmin.py`（FastAPI 依赖）与 `tools/SharedAdminSession.py`（返回共享客户端）同名但职责不同——VerifyAdmin 版通过 `from tools.SharedAdminSession import get_admin_client as get_shared_admin_client` 区分，避免冲突。
+- **实现中发现并修复的 bug（Task 5 已验证）**：
+  1. FastAPI 依赖若声明 body 模型参数，与端点 body 模型冲突导致扁平请求体 422 —— 改为依赖只接收 `Request` 手动解析 body。
+  2. `main.py` 原先未导入 `HTTPException`，login 接口抛 401 时 NameError —— 补充导入。
