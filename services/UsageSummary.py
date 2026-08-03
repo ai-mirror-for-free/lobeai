@@ -6,10 +6,11 @@
 数据源（全部 server a 可达 / HTTP 直连 server_b）：
 - api 套餐充值:     server a new api oneapi.tokens WHERE group='api' 的 Σ(remain_quota+used_quota)
                     （token 生成即算充值；remain+used 恒定=发售价）
-- api 套餐消耗:     server a new api oneapi.logs WHERE group='api' 的 Σ(quota)
+- api 套餐消耗:     server a new api oneapi.tokens WHERE group='api' 的 Σ(used_quota)
+                    （与充值同源 tokens，口径对称，不受日志清理/删除 token 影响）
 - claude code 充值: activation_codes WHERE plan_level='claude code' AND used_at IS NOT NULL
                     （仅已激活码作为充值标准；排除表邮箱剔除）
-- claude code 消耗: server_b /billing/consumption（排除表邮箱透传剔除）
+- claude code 消耗: server_b /billing/consumption（排除表邮箱透传剔除；tokens 表 Σ used_quota）
 
 granularity:
   - ''      只返回累计（summary + by_plan）
@@ -68,9 +69,10 @@ def _query_buckets(db, sql: str, params: tuple = ()) -> dict:
 
 
 def _api_stats(db, granularity: str) -> dict:
-    """api 套餐：充值 = Σ(remain_quota+used_quota) tokens；消耗 = Σ logs.quota
+    """api 套餐：充值 = Σ(remain_quota+used_quota) tokens；消耗 = Σ used_quota tokens
 
-    分桶：充值按 tokens.created_time，消耗按 logs.created_at（均为 int64 秒）。
+    充值与消耗同源 tokens 表（口径对称，消耗 ≤ 充值，不受日志清理影响）。
+    分桶：充值/消耗均按 tokens.created_time（int64 秒，token 创建时间）。
     """
     total_recharged = _query_total(
         db,
@@ -79,7 +81,8 @@ def _api_stats(db, granularity: str) -> dict:
     )
     total_consumed = _query_total(
         db,
-        'SELECT COALESCE(SUM(quota), 0) FROM logs WHERE "group" = \'api\'',
+        'SELECT COALESCE(SUM(used_quota), 0) FROM tokens '
+        'WHERE "group" = \'api\' AND deleted_at IS NULL',
     )
 
     bucket_expr = _BUCKET_EXPR.get(granularity)
@@ -94,9 +97,9 @@ def _api_stats(db, granularity: str) -> dict:
         )
         consumed_buckets = _query_buckets(
             db,
-            f"SELECT {bucket_expr.format(ts='to_timestamp(created_at)')}, "
-            f'COALESCE(SUM(quota), 0) FROM logs WHERE "group" = \'api\' '
-            f"GROUP BY 1 ORDER BY 1",
+            f"SELECT {bucket_expr.format(ts='to_timestamp(created_time)')}, "
+            f'COALESCE(SUM(used_quota), 0) FROM tokens '
+            f'WHERE "group" = \'api\' AND deleted_at IS NULL GROUP BY 1 ORDER BY 1',
         )
 
     return {
@@ -139,7 +142,7 @@ def _cc_stats(db, excluded: list, granularity: str) -> dict:
             ("claude code",) + ex_params,
         )
 
-    # server_b 消耗（排除表透传，server_b SQL 端剔除）
+    # server_b 消耗（排除表透传，server_b 端 tokens 表剔除）
     consumed_buckets = {}
     total_consumed = 0
     try:
