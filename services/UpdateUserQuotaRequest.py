@@ -103,12 +103,14 @@ def _build_plan(plan_type: str, email: str) -> dict:
             balance = _quota_to_rmb(remain)
 
         total_recharged = _quota_to_rmb(_total_recharged_quota(email, CLAUDE_CODE))
+        balance_warning = b.get("balance_warning") or {"enabled": False, "message": None}
         return {
             "type": CLAUDE_CODE,
             "balance": balance,
             "total_recharged": total_recharged,
             "unlimited": unlimited,
             "has_key": has_key,
+            "balance_warning": balance_warning,
         }
 
     logger.error(f"[update-user-quota] 未知套餐类型: {plan_type}, email={email}")
@@ -118,6 +120,7 @@ def _build_plan(plan_type: str, email: str) -> dict:
         "total_recharged": 0.0,
         "unlimited": False,
         "has_key": False,
+        "balance_warning": {"enabled": False, "message": None},
     }
 
 
