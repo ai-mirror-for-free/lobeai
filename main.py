@@ -1,5 +1,5 @@
 import requests
-from fastapi import FastAPI, Depends, Request
+from fastapi import FastAPI, Depends, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from services.NewAPIClient import NewAPIClient
 from tools.LoggerManager import LoggerManager
