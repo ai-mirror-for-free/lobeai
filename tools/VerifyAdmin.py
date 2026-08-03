@@ -1,81 +1,64 @@
+import os
 from typing import AsyncIterator
 
+from fastapi import HTTPException, Request
+from starlette.concurrency import run_in_threadpool
+
 from services.NewAPIClient import NewAPIClient
-from fastapi import HTTPException, Depends
-from tools.RequestVaild import AdminAuthRequest
+from tools.AdminTokenManager import verify_token
+from tools.SharedAdminSession import get_admin_client as get_shared_admin_client
+from tools.password_encryption import get_decrypted_password
 
 # NewAPI 管理员 role 值
 ADMIN_ROLE = 100
 
 
-async def get_admin_client(request: AdminAuthRequest) -> AsyncIterator[NewAPIClient]:
+def _check_admin_credentials(username: str, password: str) -> bool:
+    """本地比对管理员账密（NEWAPI_USER + 解密后的密码）
+
+    管理员账号即 lobeai 配置的管理员，本地比对即完成身份校验，
+    不向 new-api 发起登录，因此不产生任何 new-api 会话。
     """
-    FastAPI 生成器依赖：验证管理员身份并返回已认证的 NewAPIClient 实例
-
-    用法:
-        @app.post("/api/admin/...")
-        async def some_admin_endpoint(admin_client: NewAPIClient = Depends(get_admin_client)):
-            # 直接使用 admin_client
-            ...
-
-    响应处理结束后，finally 会自动调用 admin_client.logout() 撤销本次管理登录
-    在 new-api 上创建的会话，避免反复登录累积 active session 触发 AUTH_SESSION_LIMIT。
-
-    Args:
-        request: 包含 username 和 password 的请求体
-
-    Yields:
-        已登录的 NewAPIClient 实例（供端点使用）
-
-    Raises:
-        HTTPException: 非管理员用户或认证失败时抛出
-    """
-    admin_client = NewAPIClient()
+    if not username or not password:
+        return False
     try:
-        admin_client.session.headers.pop("New-Api-User", None)
-        admin_client.session.cookies.clear()
-        resp = admin_client.session.post(
-            f"{admin_client.base_url}/api/user/login",
-            json={"username": request.username, "password": request.password},
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        if not data.get("success"):
-            raise HTTPException(status_code=401, detail=data.get("message", "登录失败"))
-        user_data = data.get("data", {})
-        # 兼容新版 new-api（嵌套 user 对象）和老版（直接平铺 id/role）
-        user_obj = user_data.get("user") or user_data
-        user_id = user_obj.get("id")
-        user_role = user_obj.get("role")
+        expected_user = os.environ.get("NEWAPI_USER", "")
+        expected_pass = get_decrypted_password("NEWAPI_PASSWORD_ENCRYPTED")
+    except Exception:
+        return False
+    return username == expected_user and password == expected_pass
 
-        # 验证是否为管理员
-        if user_role != ADMIN_ROLE:
-            raise HTTPException(
-                status_code=403,
-                detail=f"权限不足：需要管理员权限（role={ADMIN_ROLE}），当前用户 id={user_id} role={user_role}。"
-                   f"若 role 应为 {ADMIN_ROLE} 而显示 None，请检查 new-api 登录响应结构。"
-            )
 
-        access_token = user_data.get("access_token")
-        if access_token:
-            admin_client.session.headers.update(
-                {"Authorization": f"Bearer {access_token}"}
-            )
-        elif user_id:
-            # 兼容老版（无 access_token 回退 New-Api-User header）
-            admin_client.session.headers.update({"New-Api-User": str(user_id)})
+def _extract_bearer_token(request: Request) -> str:
+    """从 Authorization: Bearer <token> 头提取 token，无则返回空串"""
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        return auth_header[len("Bearer "):].strip()
+    return ""
 
-        # 对外提供使用；依赖解析结束后由 finally 登出
-        yield admin_client
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=401, detail=f"管理员认证失败: {e}")
-    finally:
-        # 撤销本次管理登录在 new-api 上创建的会话，避免反复登录累积到 AUTH_SESSION_LIMIT
-        # （HTTP 409 Conflict）。admin_client 带登录时的 Authorization/New-Api-User 头，
-        # /api/user/logout 据此撤销会话。
-        try:
-            admin_client.logout()
-        except Exception:
-            pass
+
+async def get_admin_client(request: Request, creds: AdminAuthRequest) -> AsyncIterator[NewAPIClient]:
+    """FastAPI 依赖：验证管理员身份并返回共享管理员会话
+
+    凭证优先级（三选一）：
+      1. Authorization: Bearer <token> 头
+      2. 请求体 token 字段
+      3. 请求体 username/password（账密兼容，本地比对）
+
+    认证通过后返回 SharedAdminSession 的全局共享客户端（不登出，
+    生命周期与进程一致），保证 new-api 上管理员活跃会话恒为 1。
+    """
+    token = _extract_bearer_token(request) or (creds.token or "")
+    if token:
+        entry = await run_in_threadpool(verify_token, token)
+        if entry is None:
+            raise HTTPException(status_code=401, detail="token invalid or expired")
+    elif not _check_admin_credentials(creds.username, creds.password):
+        raise HTTPException(status_code=401, detail="管理员认证失败")
+
+    try:
+        client = await run_in_threadpool(get_shared_admin_client)
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=f"管理员会话不可用: {e}")
+
+    yield client
