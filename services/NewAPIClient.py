@@ -123,8 +123,13 @@ class NewAPIClient:
             return False
 
     def logout(self) -> None:
-        """登出并清除 Session"""
-        self.session.get(f"{self.base_url}/api/user/logout")
+        """登出并清除 Session
+
+        新版 new-api（v1.0.0-rc.22+）登出路由为 POST /api/user/auth/logout，
+        旧版 GET /api/user/logout 已移除；login 已把 access_token 写入
+        Authorization 头，此请求会随之 revoke 当前 session。
+        """
+        self.session.post(f"{self.base_url}/api/user/auth/logout")
         self.session.cookies.clear()
 
     def send_verification_code(self, email: str) -> None:
