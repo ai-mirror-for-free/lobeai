@@ -132,6 +132,21 @@ class NewAPIClient:
         self.session.post(f"{self.base_url}/api/user/auth/logout")
         self.session.cookies.clear()
 
+    def revoke_other_sessions(self) -> None:
+        """撤销当前用户除本次登录外的其他会话
+
+        新版 new-api 路由 POST /api/user/sessions/revoke-others，需带
+        Authorization Bearer access_token（login 已设置）。用于进程重启后
+        清理该管理员遗留的登录会话，避免 active session 持续累积触发
+        AUTH_SESSION_LIMIT（HTTP 409）。
+        """
+        resp = self.session.post(
+            f"{self.base_url}/api/user/sessions/revoke-others",
+            timeout=10,
+        )
+        if resp.status_code != 200:
+            resp.raise_for_status()
+
     def send_verification_code(self, email: str) -> None:
         """
         发送邮箱验证码

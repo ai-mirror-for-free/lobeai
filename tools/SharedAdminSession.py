@@ -5,11 +5,18 @@ lobeai 所有管理员操作复用同一个 new-api 登录会话，避免每次�
 
 access_token 有效期 15 分钟，距上次刷新超过 12 分钟自动 refresh；
 refresh 失败（如会话被撤销）fallback 重新 login。
+
+进程每次重启会新建一条 active session（历史遗留无法自动过期回收），
+因此登录成功后立即 revoke-others 清理旧会话，保证 A 端 new-api 上
+管理员活跃会话恒为 1。
 """
+import logging
 import threading
 import time
 
 from services.NewAPIClient import NewAPIClient
+
+logger = logging.getLogger("lobeai.shared_admin_session")
 
 REFRESH_INTERVAL = 720  # 秒，access_token 15min 过期，12min 余量
 
@@ -21,6 +28,13 @@ _last_refresh: float = 0.0
 def _do_login() -> NewAPIClient:
     client = NewAPIClient()
     client.login()  # login() 内部读 NEWAPI_USER + NEWAPI_PASSWORD_ENCRYPTED
+    # 登录成功后撤销该管理员的历史登录会话（POST /api/user/sessions/revoke-others，
+    # 带 access_token 即 revoke 其他 session），保证 A 端 new-api 上管理员活跃
+    # 会话恒为 1 —— 否则每次进程重启都会遗留一条 active session 直至 50 上限。
+    try:
+        client.revoke_other_sessions()
+    except Exception as e:
+        logger.warning(f"管理员历史会话清理失败: {e}")
     return client
 
 
