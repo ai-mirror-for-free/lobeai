@@ -104,10 +104,10 @@ def _call_server_b_redeem(
         resp = requests.post(url, json=payload, timeout=30)
     except requests.exceptions.Timeout:
         logger.error(f"[claude_code] server_b 超时: email={email}")
-        return {"status": False, "message": "B 侧兑换超时，请稍后重试"}
+        return {"status": False, "message": "claude 套餐兑换超时，请稍后重试"}
     except requests.exceptions.RequestException as e:
         logger.error(f"[claude_code] server_b 不可达: {e}, email={email}")
-        return {"status": False, "message": f"B 侧服务不可达: {e}"}
+        return {"status": False, "message": f"claude 套餐服务不可达: {e}"}
 
     try:
         data = resp.json()
@@ -116,7 +116,7 @@ def _call_server_b_redeem(
             f"[claude_code] server_b 返回非 JSON: status={resp.status_code}, "
             f"err={e}, email={email}"
         )
-        return {"status": False, "message": "B 侧返回格式异常"}
+        return {"status": False, "message": "claude 套餐返回格式异常"}
 
     if resp.status_code >= 400:
         msg = (
@@ -128,13 +128,13 @@ def _call_server_b_redeem(
         logger.error(
             f"[claude_code] server_b HTTP {resp.status_code}: {msg}, email={email}"
         )
-        return {"status": False, "message": f"B 侧兑换失败: {msg}"}
+        return {"status": False, "message": f"claude 套餐兑换失败: {msg}"}
 
     if not isinstance(data, dict) or "status" not in data:
         logger.error(
             f"[claude_code] server_b 响应缺 status 字段: {data}, email={email}"
         )
-        return {"status": False, "message": "B 侧响应格式异常"}
+        return {"status": False, "message": "claude 套餐响应格式异常"}
 
     return data
 
