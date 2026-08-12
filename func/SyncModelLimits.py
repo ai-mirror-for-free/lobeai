@@ -1,15 +1,18 @@
 """
 同步 NewAPI 令牌 (group="api") 的模型限制
 
-当 data/api.json 发生变化后，执行此脚本同步更新：
+本脚本启动时先调用 func/SyncApiJson.sync_api_json() 从 new-api 的
+OpenRouter / Vertex AI 渠道拉取最新模型并更新 data/api.json，
+再执行令牌 model_limits 同步：
 1. 通过 load_api_config 加载最新的 api.json 模型列表
 2. 查询 NewAPI 数据库中 group="api" 的令牌（命名规则 batch-{package}-{ts}-{i}）
-3. 检查并按 api.json + extra_modellist 更新 token 的 model_limits
+3. 检查并按 api.json[package] 更新 token 的 model_limits
 
 注意：
 - 套餐体系（default/vip/svip）已下线，OpenWebUI 同步逻辑已移除。
 - Claude Code 令牌 (group="claude code") 继续排除。
 - 旧版 default/vip/svip group 的存量令牌视为历史遗留，名字无法解析为 package 时跳过。
+- 模型白名单与 api.json 严格一致（不再有 extra_modellist 追加项）。
 """
 
 import json
@@ -17,7 +20,7 @@ import re
 from tools.DbScript import NewApiDatabaseManager
 from tools.LoggerManager import LoggerManager
 from tools.LoadApiConfig import load_api_config
-from services.BatchCreateTokens import extra_modellist
+from func.SyncApiJson import sync_api_json
 
 logger = LoggerManager(log_file="sync_model_limits.log")
 newapidata = NewApiDatabaseManager()
@@ -80,6 +83,9 @@ def sync_model_limits():
     """
     主同步流程
     """
+    # Step 0: 先从 new-api 渠道同步最新模型到 api.json
+    sync_api_json()
+
     # Step 1: 加载 api.json
     api_config = load_api_config()
     logger.info(f"加载 api.json 套餐: {list(api_config.keys())}")
@@ -114,8 +120,8 @@ def sync_model_limits():
             skipped_count += 1
             continue
 
-        # Step 5: 计算期望模型列表 (api.json[package] + extra_modellist)
-        expected_models = list(api_config[package]) + list(extra_modellist)
+        # Step 5: 计算期望模型列表 (api.json[package])
+        expected_models = list(api_config[package])
         current_models = _parse_model_limits(model_limits)
 
         if _list_equals(current_models, expected_models):

@@ -8,8 +8,6 @@ from tools.LoggerManager import LoggerManager
 from services.NewAPIClient import NewAPIClient, TokenConfig
 
 logger = LoggerManager(log_file="batch_create_tokens.log")
-# 追加到所有套餐模型列表后的额外模型（修改后需重启服务生效）
-extra_modellist: list[str] = ['openai/gpt-4o-mini', 'openai/gpt-4o']
 
 
 def batch_create_tokens(
@@ -50,8 +48,6 @@ def batch_create_tokens(
         }
 
     model_list = api_data[package]
-    # 拷贝后追加，避免原地修改 api.json 的全局缓存（load_api_config 是带缓存的单例）
-    model_list = model_list + extra_modellist
     model_limits_str = ",".join(model_list)
 
     # ---------------------------------------------------------------

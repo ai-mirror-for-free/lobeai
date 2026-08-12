@@ -25,6 +25,17 @@ def load_api_config() -> dict:
     return _cache
 
 
+def clear_cache():
+    """
+    清除 api.json 加载缓存
+
+    同步脚本（func/SyncApiJson.py）写回 api.json 后调用，
+    避免同进程内后续 load_api_config() 读到旧数据。
+    """
+    global _cache
+    _cache = None
+
+
 def get_image_models() -> set:
     """
     获取所有图片模型列表（来自 api.json 中 image 套餐）
