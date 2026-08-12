@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 from dotenv import load_dotenv
 from tools.password_encryption import get_decrypted_password
+from tools.ConfigManager import get_env
 from tools.DbScript import NewApiDatabaseManager  # 多 NewAPI 实例时由调用方显式注入
 
 @dataclass
@@ -40,7 +41,7 @@ class NewAPIClient:
                       _get_full_token_key_from_db 会查错 DB 拿不到完整 key。
         """
         load_dotenv()
-        self.base_url = (base_url or os.getenv("NEWAPI_URL")).rstrip("/")
+        self.base_url = (base_url or get_env("NEWAPI_URL")).rstrip("/")
         self.session = requests.Session()
         self.session.headers.update({"Content-Type": "application/json"})
         self.user_id = None
@@ -64,7 +65,7 @@ class NewAPIClient:
         Raises:
             RuntimeError: 登录失败时抛出，包含错误信息
         """
-        username = os.environ.get("NEWAPI_USER")
+        username = get_env("NEWAPI_USER")
         # 从环境变量读取加密的 NewAPI 密码并解密
         password = get_decrypted_password("NEWAPI_PASSWORD_ENCRYPTED")
         resp = self.session.post(

@@ -7,6 +7,7 @@ from starlette.concurrency import run_in_threadpool
 
 from services.NewAPIClient import NewAPIClient
 from tools.AdminTokenManager import verify_token
+from tools.ConfigManager import get_env
 from tools.SharedAdminSession import get_admin_client as get_shared_admin_client
 from tools.password_encryption import get_decrypted_password
 
@@ -25,9 +26,9 @@ def _check_admin_credentials(username, password) -> bool:
         return False
     try:
         expected_names = {
-            os.environ.get("NEWAPI_USER", ""),
-            os.environ.get("ADMIN_USERNAME", ""),
-            os.environ.get("ADMIN_EMAIL", ""),
+            get_env("NEWAPI_USER", ""),
+            get_env("ADMIN_USERNAME", ""),
+            get_env("ADMIN_EMAIL", ""),
         }
         expected_names.discard("")
         expected_pass = get_decrypted_password("NEWAPI_PASSWORD_ENCRYPTED")

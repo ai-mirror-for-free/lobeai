@@ -1,0 +1,29 @@
+# =============================================================================
+# LobeAI 配置文件（开发环境 - 代码服务器 192.168.28.13 / WSL）
+# 有 ENV=dev 时加载本文件（与 claude_agent 一致）
+#
+# 说明：
+# - 密钥（*_PASSWORD_ENCRYPTED / ENCRYPTION_KEY）一律只放 .env，不进 yaml
+# - dev 环境的 DB / new-api 与正式环境同库同实例（154.64.231.128），
+#   仅 host 不同；SERVER_B_URL 与正式一致
+# =============================================================================
+
+# --- 管理员账号 ---
+admin:
+  username: "yang"
+  email: "yf13755921935@gmail.com"
+
+# --- PostgreSQL（new-api oneapi 库）---
+database:
+  host: "154.64.231.128"
+  port: 2543
+  username: "postgres"
+
+# --- NewAPI 管理端 ---
+newapi:
+  url: "http://154.64.231.128:25142"
+  username: "yang"
+
+# --- server_b 编排器 ---
+server_b:
+  url: "https://mirror.chat-keeper.com"

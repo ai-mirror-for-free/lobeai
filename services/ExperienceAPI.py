@@ -8,6 +8,7 @@ import base64
 import os
 import re
 import requests
+from tools.ConfigManager import get_env
 from tools.LoadApiConfig import get_image_models
 from tools.LoggerManager import LoggerManager
 
@@ -104,7 +105,7 @@ def call_experience(key: str, model: str, text: str) -> dict:
             "model": "模型名"
         }
     """
-    url = f"{os.getenv('NEWAPI_URL', 'http://localhost:25142')}/v1/chat/completions"
+    url = f"{get_env('NEWAPI_URL', 'http://localhost:25142')}/v1/chat/completions"
     headers = {
         "Authorization": f"Bearer {key}",
         "Content-Type": "application/json",

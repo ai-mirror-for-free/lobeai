@@ -1,0 +1,28 @@
+# =============================================================================
+# LobeAI 配置文件（正式环境 - server a）
+# 所有非密钥配置仅从此文件读取，环境变量从 .env 文件读取
+#
+# 说明：
+# - 密钥（*_PASSWORD_ENCRYPTED / ENCRYPTION_KEY）一律只放 .env，不进 yaml
+# - 端口说明：25141 lobeai 自身 / 25142 new-api / 25143 其他服务（本仓库不使用）
+# =============================================================================
+
+# --- 管理员账号 ---
+admin:
+  username: "yang"
+  email: "yf13755921935@gmail.com"
+
+# --- PostgreSQL（new-api oneapi 库）---
+database:
+  host: "localhost"
+  port: 2543
+  username: "postgres"
+
+# --- NewAPI 管理端 ---
+newapi:
+  url: "http://localhost:25142"
+  username: "yang"
+
+# --- server_b 编排器 ---
+server_b:
+  url: "https://mirror.chat-keeper.com"

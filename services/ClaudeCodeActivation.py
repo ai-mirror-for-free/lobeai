@@ -23,6 +23,7 @@ import os
 
 import requests
 
+from tools.ConfigManager import get_env
 from tools.LoggerManager import LoggerManager
 from tools.password_encryption import get_decrypted_password
 
@@ -39,8 +40,8 @@ _ADMIN_PASSWORD_ENCRYPTED_ENV = "ADMIN_PASSWORD_ENCRYPTED"
 
 
 def _server_b_url() -> str:
-    """从 .env 读 SERVER_B_URL；缺则抛 RuntimeError（fail-fast，避免静默）"""
-    url = (os.getenv("SERVER_B_URL") or "").rstrip("/")
+    """读 SERVER_B_URL（yaml 或 env）；缺则抛 RuntimeError（fail-fast，避免静默）"""
+    url = (get_env("SERVER_B_URL") or "").rstrip("/")
     if not url:
         raise RuntimeError(
             "未配置 SERVER_B_URL，lobeai 无法委派 Claude Code 兑换给 server_b；"
@@ -57,7 +58,7 @@ def _resolve_admin_credentials() -> tuple[str, str]:
     Raises:
         RuntimeError 缺凭据时抛
     """
-    admin_user = os.getenv(_ADMIN_USER_ENV)
+    admin_user = get_env(_ADMIN_USER_ENV)
     admin_password = None
     try:
         admin_password = get_decrypted_password(_ADMIN_PASSWORD_ENCRYPTED_ENV)

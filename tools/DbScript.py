@@ -3,6 +3,7 @@ import psycopg2
 from dotenv import load_dotenv
 from tools.LoggerManager import LoggerManager
 from tools.password_encryption import get_decrypted_password
+from tools.ConfigManager import get_env
 
 class DatabaseManager:
     """管理 PostgreSQL 数据库的操作类
@@ -16,9 +17,9 @@ class DatabaseManager:
                  db_host=None, db_port=None, db_user=None, db_password=None):
         load_dotenv(env_path)
         # 默认 env, 任一字段可被显式参数 override
-        self.host = db_host or os.getenv("DB_HOST", "localhost")
-        self.port = db_port or os.getenv("DB_PORT", "5432")
-        self.user = db_user or os.getenv("DB_USERNAME")
+        self.host = db_host or get_env("DB_HOST", "localhost")
+        self.port = db_port or get_env("DB_PORT", "5432")
+        self.user = db_user or get_env("DB_USERNAME")
         # 密码: 显式传入的 password 直接用 (不二次解密); 否则用默认密文 env
         if db_password is not None:
             self.password = db_password
