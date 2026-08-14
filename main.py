@@ -366,18 +366,6 @@ async def update_user_quota(request: UpdateUserQuotaRequest):
 
     return get_user_info(username=request.username, email=request.email)
 
-# ==================== 可用模型展示 ====================
-@app.get("/api/available-models")
-async def get_available_models():
-    """
-    历史套餐可用模型列表接口
-
-    套餐体系（default/vip/svip）已下线，本路由保留以兼容既有前端调用，
-    始终返回空对象，前端在遍历渲染时退化为空列表。
-    Claude Code 模型白名单由 server_b 端控制，不在此接口暴露。
-    """
-    return {}
-
 # ==================== 额度查询 ====================
 
 
