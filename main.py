@@ -48,10 +48,26 @@ async def send_verification_code(request: SendVerificationCodeRequest):
     Args:
         request: 包含邮箱地址的请求体
     """
+    from services.ResendDeliveryChecker import (
+        is_known_bounced,
+        check_email_delivery,
+        mark_bounced,
+    )
+
     email = request.email
+    if is_known_bounced(email):
+        loggre.warning(f"该邮箱此前已确认退信，拒绝发送: {email}")
+        return {"message": "发送失败: 该邮箱不存在或无法接收邮件，请检查邮箱地址"}
+
     new_api_client = NewAPIClient()
     try:
         new_api_client.send_verification_code(email)
+        # 轮询 Resend 投递状态：硬退信（550 邮箱不存在）同步反馈给用户
+        delivery = check_email_delivery(email)
+        if delivery == "bounced":
+            mark_bounced(email)
+            loggre.warning(f"验证码投递硬退信（邮箱可能不存在）: {email}")
+            return {"message": "发送失败: 该邮箱不存在或无法接收邮件，请检查邮箱地址"}
         loggre.info("验证码已发送，请检查邮箱")
         return {"message": "验证码已发送，请检查邮箱"}
     except (RuntimeError, requests.exceptions.HTTPError) as e:
