@@ -184,16 +184,16 @@ def get_usage_summary(granularity: str = "") -> dict:
     finally:
         db.disconnect()
 
-    # 取整统一：充值/消耗均保留 2 位小数
+    # 取整规则：充值取整到整元后求和；消耗保留 2 位小数
     by_plan = [
         {
             "type": API,
-            "total_recharged": _quota_to_rmb(api["total_recharged"], rate),
+            "total_recharged": round(_quota_to_rmb(api["total_recharged"], rate)),
             "total_consumed": _quota_to_rmb(api["total_consumed"], rate),
         },
         {
             "type": CLAUDE_CODE,
-            "total_recharged": _quota_to_rmb(cc["total_recharged"], rate),
+            "total_recharged": round(_quota_to_rmb(cc["total_recharged"], rate)),
             "total_consumed": _quota_to_rmb(cc["total_consumed"], rate),
         },
     ]
@@ -201,8 +201,9 @@ def get_usage_summary(granularity: str = "") -> dict:
     result = {
         "currency": "CNY",
         "summary": {
+            # 充值：整元取整后求和；消耗：保留 2 位小数
             "total_recharged": round(
-                sum(p["total_recharged"] for p in by_plan), 2
+                sum(p["total_recharged"] for p in by_plan)
             ),
             "total_consumed": round(sum(p["total_consumed"] for p in by_plan), 2),
         },
@@ -214,17 +215,17 @@ def get_usage_summary(granularity: str = "") -> dict:
         merged = {}
         for src in (api, cc):
             for bk, quota in src["recharged_buckets"].items():
-                m = merged.setdefault(bk, {"recharged": 0.0, "consumed": 0.0})
-                m["recharged"] += _quota_to_rmb(quota, rate)
+                m = merged.setdefault(bk, {"recharged": 0, "consumed": 0.0})
+                m["recharged"] += round(_quota_to_rmb(quota, rate))
             for bk, quota in src["consumed_buckets"].items():
-                m = merged.setdefault(bk, {"recharged": 0.0, "consumed": 0.0})
+                m = merged.setdefault(bk, {"recharged": 0, "consumed": 0.0})
                 m["consumed"] += _quota_to_rmb(quota, rate)
 
         key = "by_month" if granularity == "month" else "by_week"
         result[key] = [
             {
                 "bucket": bk,
-                "recharged": round(v["recharged"], 2),
+                "recharged": v["recharged"],
                 "consumed": round(v["consumed"], 2),
             }
             for bk, v in sorted(merged.items())
