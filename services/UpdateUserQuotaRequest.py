@@ -1,10 +1,12 @@
 """
 update-user-quota 主数据聚合口（给别的项目用，只读）
 
-数据来源（每个套餐各自聚合）：
+数据来源（claude code 统一走 server_b，tokens 表同一账单）：
 - 剩余余额：直连 server_b /billing/balance?email= → remain_quota → 人民币
-- 累计充值：lobeai 自己库 activation_codes WHERE used_by=email AND plan_level=当前套餐 的 SUM(quota) → 人民币
-换算公式：RMB = quota × usd_cny_rate / 500000（与 claude_agent / 兑换链路一致）
+- 累计充值：同一接口的 total_quota（remain+used，token 全部入账额度）→ 人民币。
+  与 balance 同源同表，历史/手工/其它途径的额度充值也能体现，
+  避免 activation_codes 覆盖不全导致的「充值明显少于已用」。
+换算公式：RMB = quota × usd_cny_rate / 500000（与 claude_agent / 兑换链路一致）。
 
 返回按套餐类型打包成 plans 列表，方便未来新增套餐（append 一项即可）：
   {
@@ -20,7 +22,6 @@ update-user-quota 主数据聚合口（给别的项目用，只读）
 """
 from tools.LoggerManager import LoggerManager
 from tools.GetNewestRate import get_usd_cny_rate
-from tools.DbScript import NewApiDatabaseManager
 
 logger = LoggerManager()
 
@@ -51,29 +52,6 @@ def _server_b_balance(email: str) -> dict:
         return {}
 
 
-def _total_recharged_quota(email: str, plan_level: str) -> int:
-    """累计充值额度：lobeai 自己库 activation_codes 对应用户、对应套餐已兑换 quota 求和"""
-    db = NewApiDatabaseManager()
-    db.connect()
-    try:
-        rows = db.execute_query(
-            "SELECT COALESCE(SUM(quota), 0) FROM activation_codes "
-            "WHERE used_by = %s AND plan_level = %s",
-            (email, plan_level),
-        )
-        if rows and rows[0] and rows[0][0] is not None:
-            return int(rows[0][0])
-        return 0
-    except Exception as e:
-        logger.error(
-            f"[update-user-quota] activation_codes 累计充值查询失败: {e}, "
-            f"email={email}, plan_level={plan_level}"
-        )
-        return 0
-    finally:
-        db.disconnect()
-
-
 def _quota_to_rmb(quota, rate: float | None = None) -> float:
     """NewAPI 额度 → 人民币（rate 可外部传入，保证单次请求内汇率口径一致）"""
     if not quota:
@@ -97,13 +75,19 @@ def _build_plan(plan_type: str, email: str) -> dict:
         remain = b.get("remain_quota")
         unlimited = bool(b.get("unlimited"))
         has_key = bool(b.get("has_key"))
+        total_quota = b.get("total_quota")
 
         # 剩余余额：unlimited 或拿不到 remain 时余额按 0，由 unlimited 标志区分
         balance = 0.0
         if not unlimited and remain is not None:
             balance = _quota_to_rmb(remain)
 
-        total_recharged = _quota_to_rmb(_total_recharged_quota(email, CLAUDE_CODE))
+        # 累计充值 = token 全部入账额度（remain+used，与 balance 同源同表）。
+        # 历史/手工/其它途径的额度充值也计入，避免 activation_codes 覆盖不全
+        total_recharged = 0.0
+        if not unlimited and total_quota is not None:
+            total_recharged = _quota_to_rmb(total_quota)
+
         balance_warning = b.get("balance_warning") or {"enabled": False, "message": None}
         return {
             "type": CLAUDE_CODE,
