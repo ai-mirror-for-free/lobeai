@@ -74,12 +74,13 @@ def _total_recharged_quota(email: str, plan_level: str) -> int:
         db.disconnect()
 
 
-def _quota_to_rmb(quota) -> float:
-    """NewAPI 额度 → 人民币"""
+def _quota_to_rmb(quota, rate: float | None = None) -> float:
+    """NewAPI 额度 → 人民币（rate 可外部传入，保证单次请求内汇率口径一致）"""
     if not quota:
         return 0.0
     try:
-        rate, _ = get_usd_cny_rate()
+        if rate is None:
+            rate, _ = get_usd_cny_rate()
         return round(float(quota) / QUOTA_TO_USD * rate, 2)
     except Exception as e:
         logger.error(f"[update-user-quota] 汇率换算失败: {e}, quota={quota}")
