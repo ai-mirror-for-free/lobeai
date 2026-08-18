@@ -3,23 +3,17 @@
 
 统计全部套餐的累计充值 + 累计消耗，统一人民币口径。
 
-数据源（全部 server a 可达 / HTTP 直连 server_b）：
-- api 套餐充值:     server a new api oneapi.tokens WHERE group='api' 的 Σ(remain_quota+used_quota)
-                    （token 生成即算充值；remain+used 恒定=发售价）
-- api 套餐消耗:     server a new api oneapi.tokens WHERE group='api' 的 Σ(used_quota)
-                    （与充值同源 tokens，口径对称，不受日志清理/删除 token 影响）
-- claude code 充值: activation_codes WHERE plan_level='claude code' AND used_at IS NOT NULL
-                    （仅已激活码作为充值标准；排除表邮箱剔除）
-- claude code 消耗: server_b /billing/consumption/allocated（排除表邮箱剔除；
-                    仅返回各 email 累计 used_quota，不做分桶）
+数据源：
+- api 套餐:         server a new api oneapi.tokens WHERE group='api'
+                     充值 = Σ(remain_quota+used_quota)，消耗 = Σ used_quota
+- claude code 套餐: server_b /billing/consumption（HTTP 直连，同一 SQL 出
+                     充值/消耗，排除表邮箱剔除）
 
-分桶口径（claude code 关键修正）：
-- recharged 与 consumed 分桶共用 activation_codes.used_at 时间轴 —— consumed 按
-  每笔激活码 quota 占该 email 总充值的比例，把该 email 累计消耗分摊到各 used_at 桶。
-  数学上每桶「消耗 ≤ 充值」（累计消耗 ≤ 累计充值），彻底避免历史版本按 token
-  created_time 落桶导致的「单桶 consumed > recharged」错位。
-- api 套餐无累加充值（一次充值一个 token，created_time 即入账时间），分桶保持
-  按 created_time，口径天然对称。
+口径设计（两个套餐统一）：
+- 充值与消耗同源同表（tokens）同时间桶（created_time），单桶「消耗 ≤ 充值」
+  数学上恒成立（同批 token 的 used ≤ remain+used），不受 logs 表清理、
+  删除 token、以及续费累加不改 created_time 的影响。
+- 分桶：month → YYYY-MM；week → 自然周周一 YYYY-MM-DD。
 
 取整：充值/消耗统一 round 2 位小数；单次请求内汇率取一次（rate 参数透传），
 避免分桶与汇总因汇率取值时机不同而产生不一致。
@@ -27,12 +21,11 @@
 granularity:
   - ''      只返回累计（summary + by_plan）
   - month   额外返回按自然月分桶（YYYY-MM）
-  - week    额外返回按自然周分桶（周一为一周起点，YYYY-MM-DD）
+  - week    额外返回按自然周分桶（YYYY-MM-DD）
 
 排除表：data/excluded_emails.json，{"emails": [...]}，仅限 claude code 套餐统计。
 """
 import json
-from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from tools.LoggerManager import LoggerManager
@@ -60,18 +53,6 @@ def _load_excluded_emails() -> list:
     except Exception as e:
         logger.error(f"[usage-summary] 排除表读取失败: {e}")
     return []
-
-
-def _bucket_key(ts, granularity: str) -> str:
-    """unix 秒 → 分桶 key；month → YYYY-MM；week → 自然周周一 YYYY-MM-DD
-
-    claude code 的 recharged/consumed 分桶统一走本函数（同源同口径）。
-    """
-    d = datetime.fromtimestamp(int(ts), tz=timezone.utc)
-    if granularity == "month":
-        return d.strftime("%Y-%m")
-    monday = d - timedelta(days=d.weekday())
-    return monday.strftime("%Y-%m-%d")
 
 
 def _query_total(db, sql: str, params: tuple = ()) -> int:
@@ -137,93 +118,34 @@ def _api_stats(db, granularity: str) -> dict:
     }
 
 
-def _load_cc_recharges(db, excluded: list) -> list:
-    """claude code 已核销激活码明细（排除表剔除）
-
-    Returns:
-        [{"email": str(小写), "used_at": int(unix 秒), "quota": int}, ...]
-    """
-    ex_cond = ""
-    ex_params: tuple = ()
-    if excluded:
-        placeholders = ",".join(["%s"] * len(excluded))
-        ex_cond = f" AND lower(used_by) NOT IN ({placeholders})"
-        ex_params = tuple(excluded)
-
-    sql = (
-        "SELECT lower(used_by), "
-        "COALESCE(EXTRACT(EPOCH FROM used_at)::bigint, 0), "
-        "COALESCE(quota, 0) "
-        "FROM activation_codes "
-        "WHERE plan_level = %s AND used_at IS NOT NULL" + ex_cond +
-        " ORDER BY used_at"
-    )
-    rows = db.execute_query(sql, ("claude code",) + ex_params) or []
-    return [
-        {"email": str(r[0]), "used_at": int(r[1]), "quota": int(r[2])}
-        for r in rows
-    ]
-
-
 def _cc_stats(db, excluded: list, granularity: str) -> dict:
-    """claude code 套餐：充值 = 已激活码 Σ quota；消耗 = 各 email used_quota 按充值比例分摊
+    """claude code 套餐：充值/消耗统一走 server_b tokens 表（同源对称）
 
-    分桶（recharged 与 consumed 同一时间轴）：
-    - recharged: 按 activation_codes.used_at
-    - consumed:  server_b 返回各 email 累计 used_quota，按该 email 每笔激活码
-                  quota 占比分摊到对应 used_at 桶（token 无匹配充值记录时兜底
-                  按其 created_time 落桶），保证每桶消耗 ≤ 充值。
+    server_b /billing/consumption 一个 SQL 同时出充值(Σ remain+used)与
+    消耗(Σ used)，分桶按 token created_time，与 api 套餐同口径，
+    单桶消耗恒 ≤ 充值。排除表透传剔除。
     """
-    recharges = _load_cc_recharges(db, excluded)
-    total_recharged = sum(r["quota"] for r in recharges)
-
-    recharged_buckets = {}
-    if granularity in ("month", "week"):
-        for r in recharges:
-            bk = _bucket_key(r["used_at"], granularity)
-            recharged_buckets[bk] = recharged_buckets.get(bk, 0.0) + float(r["quota"])
-
-    # server_b 拿各 email 累计消耗（排除表剔除；不做分桶）
-    consumed_buckets = {}
+    total_recharged = 0
     total_consumed = 0
+    recharged_buckets = {}
+    consumed_buckets = {}
     try:
         import requests
-        url = _server_b_url() + "/billing/consumption/allocated"
-        payload = {"granularity": granularity or "total"}
+        url = _server_b_url() + "/billing/consumption"
+        params = {"granularity": granularity or "total", "start_ts": 0, "end_ts": 0}
         if excluded:
-            payload["exclude"] = ",".join(excluded)
-        resp = requests.post(url, json=payload, timeout=15)
+            params["exclude"] = ",".join(excluded)
+        resp = requests.get(url, params=params, timeout=15)
         resp.raise_for_status()
         data = resp.json()
-        total_consumed = int(data.get("total") or 0)
-
-        if granularity in ("month", "week"):
-            # 按 email 聚合充值明细，用于比例分摊
-            by_email_total: dict = {}
-            for r in recharges:
-                by_email_total[r["email"]] = (
-                    by_email_total.get(r["email"], 0) + r["quota"]
-                )
-            by_email_used = {item["email"]: item for item in data.get("by_email") or []}
-
-            for email, used in by_email_used.items():
-                used = int(used.get("used") or 0)
-                created_time = int(used.get("created_time") or 0)
-                if not used:
-                    continue
-                total_q = by_email_total.get(email, 0)
-                if total_q > 0:
-                    for r in recharges:
-                        if r["email"] == email:
-                            alloc = used * r["quota"] / float(total_q)
-                            bk = _bucket_key(r["used_at"], granularity)
-                            consumed_buckets[bk] = consumed_buckets.get(bk, 0.0) + alloc
-                elif created_time:
-                    # 兜底：token 有消耗但无对应充值记录 → 按创建时间落桶
-                    bk = _bucket_key(created_time, granularity)
-                    consumed_buckets[bk] = consumed_buckets.get(bk, 0.0) + float(used)
+        total_recharged = int(data.get("total_recharged") or 0)
+        total_consumed = int(data.get("total_consumed") or 0)
+        for b in data.get("buckets") or []:
+            bk = str(b.get("bucket"))
+            recharged_buckets[bk] = float(b.get("recharged") or 0)
+            consumed_buckets[bk] = float(b.get("consumed") or 0)
     except Exception as e:
-        logger.error(f"[usage-summary] server_b /billing/consumption/allocated 失败: {e}")
+        logger.error(f"[usage-summary] server_b /billing/consumption 失败: {e}")
 
     return {
         "total_recharged": total_recharged,
