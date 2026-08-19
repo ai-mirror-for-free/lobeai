@@ -26,13 +26,13 @@ CLAUDE_PLAN_LEVEL = "claude code"
 def _rmb_to_quota(price_rmb: float) -> int:
     """
     人民币 → quota 额度单位
-    与 services/BatchCreateTokens.batch_create_tokens 公式保持一致:
-        remain_quota = int(price / rate * 500000)
+    quota 向上取整 (int(...) + 1)，保证用户实际额度不低于付款价值:
+        remain_quota = int(price / rate * 500000) + 1
     """
     rate, local = get_usd_cny_rate()
     if not local:
         logger.warning("[claude_code] 汇率获取失败，使用缓存/默认汇率")
-    return int(price_rmb / rate * 500000)
+    return int(price_rmb / rate * 500000) + 1
 
 
 def _normalize_task(task: list) -> dict | None:
