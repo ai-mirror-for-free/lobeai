@@ -212,3 +212,4 @@ logs
 test
 pricing_plan.json
 usd_cny_rate.json
+data/text
