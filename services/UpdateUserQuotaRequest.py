@@ -39,11 +39,14 @@ def _server_b_balance(email: str) -> dict:
         dict（可能含 remain_quota / unlimited / has_key）；调用失败返回 {}
     """
     import requests
-    from services.ClaudeCodeActivation import _server_b_url
+    from services.ClaudeCodeActivation import _server_b_url, _cf_access_headers
 
     try:
         url = _server_b_url() + "/billing/balance"
-        resp = requests.get(url, params={"email": email}, timeout=10)
+        resp = requests.get(
+            url, params={"email": email}, timeout=10,
+            headers=_cf_access_headers(),
+        )
         resp.raise_for_status()
         data = resp.json()
         return data if isinstance(data, dict) else {}

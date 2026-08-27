@@ -32,7 +32,7 @@ from tools.LoggerManager import LoggerManager
 from tools.DbScript import NewApiDatabaseManager
 from tools.GetNewestRate import get_usd_cny_rate
 from services.UpdateUserQuotaRequest import _quota_to_rmb
-from services.ClaudeCodeActivation import _server_b_url
+from services.ClaudeCodeActivation import _server_b_url, _cf_access_headers
 
 logger = LoggerManager(log_file="usage_summary.log")
 
@@ -135,7 +135,9 @@ def _cc_stats(db, excluded: list, granularity: str) -> dict:
         params = {"granularity": granularity or "total", "start_ts": 0, "end_ts": 0}
         if excluded:
             params["exclude"] = ",".join(excluded)
-        resp = requests.get(url, params=params, timeout=15)
+        resp = requests.get(
+            url, params=params, timeout=15, headers=_cf_access_headers()
+        )
         resp.raise_for_status()
         data = resp.json()
         total_recharged = int(data.get("total_recharged") or 0)
