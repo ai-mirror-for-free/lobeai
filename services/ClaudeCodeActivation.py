@@ -50,6 +50,28 @@ def _server_b_url() -> str:
     return url
 
 
+def _cf_access_headers() -> dict:
+    """返回 Cloudflare Service Token 认证头；未配置则空 dict（不影响现有流量）。
+
+    2026-08-27 起 A↔B 三子域（mirror/sse/files）启用 Enforce Access JWT，
+    lobeai 调 server_b 必须带此头，否则被 cloudflared 拦截为 403。
+    逻辑对齐 claude_agent/sdk/orchestrator_client.py:_cf_access_headers：
+    Client ID 明文、Secret 走 ENCRYPTION_KEY 加密（.env）。
+    """
+    headers = {}
+    try:
+        client_id = os.getenv("CF_ACCESS_CLIENT_ID", "")
+        secret = get_decrypted_password("CF_ACCESS_CLIENT_SECRET_ENCRYPTED")
+        if client_id and secret:
+            headers = {
+                "CF-Access-Client-Id": client_id,
+                "CF-Access-Client-Secret": secret,
+            }
+    except Exception as e:
+        logger.warning(f"[claude_code] CF access token 未配置，跳过认证头: {e}")
+    return headers
+
+
 def _resolve_admin_credentials() -> tuple[str, str]:
     """从 .env 解析 NewAPI 管理员账号明文
 
@@ -102,7 +124,9 @@ def _call_server_b_redeem(
         "name_prefix": NAME_PREFIX,
     }
     try:
-        resp = requests.post(url, json=payload, timeout=30)
+        resp = requests.post(
+            url, json=payload, timeout=30, headers=_cf_access_headers()
+        )
     except requests.exceptions.Timeout:
         logger.error(f"[claude_code] server_b 超时: email={email}")
         return {"status": False, "message": "claude 套餐兑换超时，请稍后重试"}
