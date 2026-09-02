@@ -74,3 +74,15 @@ SELECT "group", COUNT(*) AS alive_count
 --   - tokens: (id, key, name, status, remain_quota, unlimited_quota,
 --              model_limits_enabled, model_limits, "group", expired_time, ...)
 -- =============================================================================
+
+
+-- -----------------------------------------------------------------------------
+
+-- -----------------------------------------------------------------------------
+-- 7) 邀请系统 invite_bindings / invite_rewards 已迁移至 claude_agent 库
+--    说明：早期 lobeai 的 activation_codes/users_center 落在 oneapi 属于设计缺陷，
+--    邀请系统为自有业务，表已改落在 claude_agent 库（见 /docs/schema.sql 第 14 节）
+--    本文件不再建表，运维请在 claude_agent 库执行 /docs/schema.sql
+-- -----------------------------------------------------------------------------
+-- （已迁移，无 DDL）
+

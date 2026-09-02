@@ -24,7 +24,28 @@ logger = LoggerManager(log_file="user_manager.log")
 def main_register_user(
     username: str, password: str, email: str, verification_code: str, aff_code=None
 ):
-    # NewAPI 注册
+    # 邀请码前置校验（复用 new-api aff_code，邀请者必须已充值走 server_b 同口径）
+    aff_code = (aff_code or "").strip() if isinstance(aff_code, str) else aff_code
+    inviter = None
+    if aff_code:
+        try:
+            from services.InviteService import validate_invite
+            inviter, err = validate_invite(aff_code, email)
+            if err:
+                logger.warning(f"[invite] 注册拒绝 aff_code={aff_code} email={email} reason={err}")
+                return {
+                    "success": False,
+                    "message": err,
+                }
+            # validate 通过则 inviter 非 None，无码则 inviter 为 None
+        except Exception as e:
+            logger.error(f"[invite] 校验异常 aff_code={aff_code} email={email}: {e}")
+            return {
+                "success": False,
+                "message": f"邀请码校验失败: {e}",
+            }
+
+    # NewAPI 注册（仍透传 aff_code 让 new-api 写 inviter_id，原有逻辑不受影响）
     try:
         newapiclient.register(
             username, password, email, verification_code, aff_code
@@ -70,6 +91,40 @@ def main_register_user(
     logger.info(
         f"用户 {username} 已在 users_center 初始化: plan_level=default (历史占位)"
     )
+
+    # 邀请绑定落库（仅新用户且有有效邀请码时）
+    if inviter and aff_code:
+        try:
+            from services.InviteService import create_binding
+            # need invitee user id from new-api users
+            invitee_uid = None
+            try:
+                qdb = NewApiDatabaseManager()
+                qdb.connect()
+                if qdb.conn:
+                    with qdb.conn.cursor() as cur:
+                        cur.execute("SELECT id FROM users WHERE email = %s LIMIT 1", (email.strip().lower(),))
+                        r = cur.fetchone()
+                        if r:
+                            invitee_uid = int(r[0])
+                    qdb.disconnect()
+            except Exception as e:
+                logger.error(f"[invite] 查询 invitee uid 失败 {email}: {e}")
+                try:
+                    qdb.disconnect()
+                except Exception:
+                    pass
+            if invitee_uid:
+                ok, msg = create_binding(email, invitee_uid, inviter, aff_code)
+                if not ok:
+                    logger.warning(f"[invite] 绑定落库失败 email={email} aff={aff_code}: {msg}")
+                else:
+                    logger.info(f"[invite] 绑定落库成功 email={email} aff={aff_code}")
+            else:
+                logger.error(f"[invite] 未找到 invitee uid email={email} 无法绑定")
+        except Exception as e:
+            logger.error(f"[invite] 绑定异常 email={email}: {e}")
+
     return {
         "success": True,
         "message": "用户已创建成功, 请使用 Claude Code 激活码激活",

@@ -115,22 +115,6 @@ def _build_plan(plan_type: str, email: str) -> dict:
 def get_user_info(username, email):
     """
     查询用户额度（人民币，只读），按套餐类型打包为 plans 列表
-
-    Returns:
-        {
-            "email": ...,
-            "currency": "CNY",
-            "plans": [
-                {
-                    "type": "claude code",
-                    "balance": float,          # 剩余可用余额 ¥（unlimited 时为 0.0，看 unlimited 标志）
-                    "total_recharged": float,  # 该套餐累计充值 ¥
-                    "unlimited": bool,
-                    "has_key": bool,
-                },
-                ...  # 未来新增套餐在此追加
-            ],
-        }
     """
     plans = [_build_plan(CLAUDE_CODE, email)]
 

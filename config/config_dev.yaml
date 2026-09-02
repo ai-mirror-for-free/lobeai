@@ -25,5 +25,7 @@ newapi:
   username: "yang"
 
 # --- server_b 编排器 ---
+# dev 指向本机 tmux 的 server_b（127.0.0.1:9000），线上 mirror 仅 prod 用；
+# lobeai 的 InviteService.reward 必须过 server_b HTTP，dev 用本机才能命中本地 /internal/invite/bonus
 server_b:
-  url: "https://mirror.chat-keeper.com"
+  url: "http://127.0.0.1:9000"

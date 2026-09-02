@@ -24,6 +24,10 @@ granularity:
   - week    额外返回按自然周分桶（YYYY-MM-DD）
 
 排除表：data/excluded_emails.json，{"emails": [...]}，仅限 claude code 套餐统计。
+
+扣除：claude code 累计充值需剔除邀请返利的假收入（claude_agent.invite_rewards.reward_quota），
+按 quota 原值扣除后再换算人民币，分桶维度同样按 invite_rewards.created_at 分桶扣除；
+避免 invite bonus 计入平台真实充值流水。
 """
 import json
 from pathlib import Path
@@ -41,6 +45,56 @@ EXCLUDED_FILE = Path(__file__).resolve().parent.parent / "data" / "excluded_emai
 # 套餐类型
 API = "api"
 CLAUDE_CODE = "claude code"
+
+
+def _get_agent_db():
+    """claude_agent 库（存放 invite_rewards），ENV=dev 时走 127.0.0.1:2544"""
+    import os
+    from tools.DbScript import DatabaseManager
+    if os.getenv("ENV") == "dev":
+        return DatabaseManager(db_name="claude_agent", db_host="127.0.0.1", db_port="2544")
+    return DatabaseManager(db_name="claude_agent")
+
+
+def _query_invite_fake(granularity: str) -> tuple[int, dict]:
+    """查询邀请返利的假收入（quota 单位）
+
+    Returns: (total_fake_quota, {bucket: fake_quota})
+    失败返回 (0, {})，不影响主统计。
+    """
+    total = 0
+    buckets: dict[str, float] = {}
+    db = _get_agent_db()
+    try:
+        db.connect()
+        if not db.conn:
+            return 0, {}
+        with db.conn.cursor() as cur:
+            cur.execute("SELECT COALESCE(SUM(reward_quota),0) FROM invite_rewards")
+            row = cur.fetchone()
+            total = int(row[0] or 0) if row else 0
+            if granularity in ("month", "week"):
+                if granularity == "month":
+                    expr = "to_char(date_trunc('month', created_at), 'YYYY-MM')"
+                else:
+                    expr = "to_char(date_trunc('week', created_at), 'YYYY-MM-DD')"
+                cur.execute(f"SELECT {expr}, COALESCE(SUM(reward_quota),0) FROM invite_rewards GROUP BY 1 ORDER BY 1")
+                for bk, quota in cur.fetchall():
+                    buckets[str(bk)] = float(int(quota or 0))
+    except Exception as e:
+        logger.warning(f"[usage-summary] 邀请假收入查询失败: {e}")
+        try:
+            if db.conn:
+                db.conn.rollback()
+        except Exception:
+            pass
+        return 0, {}
+    finally:
+        try:
+            db.disconnect()
+        except Exception:
+            pass
+    return total, buckets
 
 
 def _load_excluded_emails() -> list:
@@ -185,6 +239,22 @@ def get_usage_summary(granularity: str = "") -> dict:
         raise
     finally:
         db.disconnect()
+
+    # 剔除邀请返利假收入（仅 claude code，quota 原值扣除）
+    try:
+        fake_total, fake_buckets = _query_invite_fake(granularity)
+        if fake_total:
+            cc["total_recharged"] = max(0, int(cc.get("total_recharged") or 0) - int(fake_total))
+            # 分桶同样扣除，避免 month/week 维度仍含假收入
+            if fake_buckets:
+                for bk, fq in fake_buckets.items():
+                    cur = float(cc.get("recharged_buckets", {}).get(bk) or 0)
+                    cc["recharged_buckets"][bk] = max(0.0, cur - float(fq))
+                    # 若该桶原本无充值但有假收入（极少，跨时区/延迟），仍置 0，不产生负桶
+                # 对未出现在 fake_buckets 的桶不处理
+            logger.info(f"[usage-summary] 已剔除邀请假收入 total_quota={fake_total} buckets={len(fake_buckets)}")
+    except Exception as e:
+        logger.warning(f"[usage-summary] 剔除邀请假收入失败（忽略）: {e}")
 
     # 取整规则：充值取整到整元后求和；消耗保留 2 位小数
     by_plan = [

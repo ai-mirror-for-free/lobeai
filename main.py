@@ -349,6 +349,23 @@ async def get_text(key: str):
     return data
 
 
+
+# ==================== 邀请系统 ====================
+
+@app.post("/api/invite/info")
+async def invite_info(request: InviteInfoRequest):
+    """
+    一站式邀请信息：邀请码 + 累计返利 + 邀请人数
+    供前端“我的邀请”页一次性拉取
+    """
+    from services.InviteService import get_user_aff_code, get_invite_rewards_summary
+    try:
+        code = get_user_aff_code(request.email)
+        rewards = get_invite_rewards_summary(request.email)
+        return {"success": True, "data": {"email": request.email, "aff_code": code or "", **rewards}}
+    except Exception as e:
+        return {"success": False, "message": str(e)}
+
 # ==================== 额度查询 ====================
 
 @app.post("/api/update-user-quota")
@@ -365,6 +382,7 @@ async def update_user_quota(request: UpdateUserQuotaRequest):
     from services.UpdateUserQuotaRequest import get_user_info
 
     return get_user_info(username=request.username, email=request.email)
+
 
 # ==================== 额度查询 ====================
 

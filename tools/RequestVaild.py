@@ -109,3 +109,15 @@ class ExperienceRequest(BaseModel):
     key: str    # 用户 API key (sk-xxx)
     model: str  # 模型名称
     text: str   # 用户输入的文本
+class InviteInfoRequest(BaseModel):
+    """邀请信息查询请求"""
+    email: EmailStr
+
+class InviteCodeRequest(BaseModel):
+    """查询用户邀请码（已废弃，请用 /api/invite/info）"""
+    email: EmailStr
+
+class InviteRewardsRequest(BaseModel):
+    """查询用户累计返利（已废弃，请用 /api/invite/info）"""
+    email: EmailStr
+
