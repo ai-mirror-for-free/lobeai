@@ -87,14 +87,20 @@ async def register_user(request: RegisterRequest):
         注册成功消息和用户信息
     """
     from services.CreaterUsers import main_register_user
-    
-    return main_register_user(
+
+    result = main_register_user(
         username=request.username,
         password=request.password,
         email=request.email,
         verification_code=request.verification_code,
         aff_code=request.aff_code,
     )
+    # 业务拒绝（邀请码不符合条件/用户名已存在等）返回 400，
+    # 前端对 4xx 有现成的错误展示逻辑，避免 200+success:false 被误当成功
+    if isinstance(result, dict) and result.get("success") is False:
+        from fastapi.responses import JSONResponse
+        return JSONResponse(status_code=400, content=result)
+    return result
 
 
 @app.post("/api/random-activation-code")
