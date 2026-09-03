@@ -56,7 +56,7 @@ def _get_agent_db():
     return DatabaseManager(db_name="claude_agent")
 
 
-def _query_invite_fake(granularity: str) -> tuple[int, dict]:
+def _query_invite_fake(granularity: str, excluded: list = None) -> tuple[int, dict]:
     """查询邀请返利的假收入（quota 单位）
 
     Returns: (total_fake_quota, {bucket: fake_quota})
@@ -70,7 +70,13 @@ def _query_invite_fake(granularity: str) -> tuple[int, dict]:
         if not db.conn:
             return 0, {}
         with db.conn.cursor() as cur:
-            cur.execute("SELECT COALESCE(SUM(reward_quota),0) FROM invite_rewards")
+            where = ""
+            params = []
+            if excluded:
+                placeholders = ",".join(["%s"] * len(excluded))
+                where = f" WHERE inviter_email NOT IN ({placeholders})"
+                params = list(excluded)
+            cur.execute(f"SELECT COALESCE(SUM(reward_quota),0) FROM invite_rewards{where}", params)
             row = cur.fetchone()
             total = int(row[0] or 0) if row else 0
             if granularity in ("month", "week"):
@@ -78,7 +84,7 @@ def _query_invite_fake(granularity: str) -> tuple[int, dict]:
                     expr = "to_char(date_trunc('month', created_at), 'YYYY-MM')"
                 else:
                     expr = "to_char(date_trunc('week', created_at), 'YYYY-MM-DD')"
-                cur.execute(f"SELECT {expr}, COALESCE(SUM(reward_quota),0) FROM invite_rewards GROUP BY 1 ORDER BY 1")
+                cur.execute(f"SELECT {expr}, COALESCE(SUM(reward_quota),0) FROM invite_rewards{where} GROUP BY 1 ORDER BY 1", params)
                 for bk, quota in cur.fetchall():
                     buckets[str(bk)] = float(int(quota or 0))
     except Exception as e:
@@ -242,7 +248,7 @@ def get_usage_summary(granularity: str = "") -> dict:
 
     # 剔除邀请返利假收入（仅 claude code，quota 原值扣除）
     try:
-        fake_total, fake_buckets = _query_invite_fake(granularity)
+        fake_total, fake_buckets = _query_invite_fake(granularity, excluded)
         if fake_total:
             cc["total_recharged"] = max(0, int(cc.get("total_recharged") or 0) - int(fake_total))
             # 分桶同样扣除，避免 month/week 维度仍含假收入
