@@ -80,17 +80,22 @@ def main_register_user(
 
     # 新用户：仅在 users_center 初始化一行
     # - plan_level = "default" （历史占位字段，套餐已下线，不再参与判断）
-    # - quota_left / days_left / token 全部为 0/空，激活后由对应链路写入
+    # - token 必须写 NULL 而非空串：token 列有唯一约束，空串会被已有空串行卡死
     newapidata.connect()
-    newapidata.execute_command(
+    init_ok = newapidata.execute_command(
         "INSERT INTO users_center (name, email, plan_level, plan_price, days_left, quota_left, recharge, token) "
         "VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
-        (username, email, "default", 0, 0, 0, 0, ""),
+        (username, email, "default", 0, 0, 0, 0, None),
     )
     newapidata.disconnect()
-    logger.info(
-        f"用户 {username} 已在 users_center 初始化: plan_level=default (历史占位)"
-    )
+    if init_ok:
+        logger.info(
+            f"用户 {username} 已在 users_center 初始化: plan_level=default (历史占位)"
+        )
+    else:
+        logger.error(
+            f"用户 {username} users_center 初始化失败，请人工检查 users_center 表"
+        )
 
     # 邀请绑定落库（仅新用户且有有效邀请码时）
     if inviter and aff_code:
