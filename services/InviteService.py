@@ -451,7 +451,7 @@ def get_invite_rewards_summary(email: str) -> dict:
                     "recharge_rmb": float(r[2]),
                     "reward_rmb": float(r[3]),
                     "reward_quota": int(r[4]),
-                    "created_at": str(r[5]),
+                    "created_at": r[5].strftime("%Y-%m-%d"),
                 })
             return {
                 "invite_count": invite_count,
