@@ -45,11 +45,23 @@ def reset_password(username: str, email: str, req: Request) -> dict:
     ip_reset_attempts[ip] = [t for t in ip_reset_attempts[ip] if now - t < RESET_WINDOW]
 
     # 校验用户名和邮箱（从 NewAPI users 表查询，排除管理员 role=100）
+    # 用户名匹配规则：精确相等，或（库用户名长度>=2 时）双向包含；
+    # POSITION 不解析 %/_ 通配符，且全部走 psycopg2 参数化，防注入
     newapi_db = NewApiDatabaseManager()
     newapi_db.connect()
     result = newapi_db.execute_query(
-        "SELECT id FROM users WHERE username = %s AND email = %s AND role != 100",
-        (username, email),
+        """
+        SELECT id FROM users
+        WHERE email = %s AND role != 100
+          AND username IS NOT NULL AND username <> ''
+          AND (
+            username = %s
+            OR (length(username) >= 2
+                AND (POSITION(%s IN username) > 0
+                  OR POSITION(username IN %s) > 0))
+          )
+        """,
+        (email, username, username, username),
     )
 
     if not result:
