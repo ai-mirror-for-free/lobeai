@@ -372,6 +372,23 @@ async def invite_info(request: InviteInfoRequest):
     except Exception as e:
         return {"success": False, "message": str(e)}
 
+
+@app.post("/api/admin/invite/stats")
+async def invite_stats(
+    request: InviteStatsRequest,
+    admin_client: NewAPIClient = Depends(get_admin_client),
+):
+    """
+    【管理员】邀请统计 + 套利排查
+
+    1. 被邀请人数 2. 累计返利 3. 邀请人与被邀请人登录 IP 交集 → 套利疑似，
+    疑似者进一步查其 B 端 token 当前分组：group 不为 backup（高倍率组，
+    用于抑制返利套现）→ 未处理套利用户。排除名单复用 data/excluded_emails.json。
+    """
+    from services.InviteStats import get_invite_stats
+
+    return get_invite_stats(include_excluded=request.include_excluded)
+
 # ==================== 额度查询 ====================
 
 @app.post("/api/update-user-quota")

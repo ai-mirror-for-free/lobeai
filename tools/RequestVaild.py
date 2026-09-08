@@ -121,3 +121,7 @@ class InviteRewardsRequest(BaseModel):
     """查询用户累计返利（已废弃，请用 /api/invite/info）"""
     email: EmailStr
 
+
+class InviteStatsRequest(BaseModel):
+    """邀请统计 + 套利排查请求（仅管理员）"""
+    include_excluded: bool = False  # 是否包含排除名单（测试号等）的绑定
