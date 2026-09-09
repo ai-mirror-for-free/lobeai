@@ -56,22 +56,31 @@ def _lookup_group_via_server_b(email: str) -> dict:
 
 
 def _collect_user_ips(db, user_ids: list) -> dict:
-    """查 user_sessions，返回 {user_id: set(ip)}（v4/v6 合并，空值剔除）"""
+    """查 user_sessions，返回 {newapi_user_id: set(ip)}（v4/v6 合并，空值剔除）
+
+    注意：invite_bindings 存的是 NewAPI 的 user_id（newapi_user_id），
+    而 user_sessions.user_id 是 claude_agent 库的 users.id，
+    必须通过 users.newapi_user_id JOIN 才能正确关联。
+    """
     if not user_ids:
         return {}
     rows = db.execute_query(
         """
-        SELECT user_id, ip_v4 FROM user_sessions
-         WHERE user_id = ANY(%s) AND ip_v4 IS NOT NULL AND ip_v4 <> ''
+        SELECT u.newapi_user_id, us.ip_v4
+        FROM user_sessions us
+        JOIN users u ON u.id = us.user_id
+        WHERE u.newapi_user_id = ANY(%s) AND us.ip_v4 IS NOT NULL AND us.ip_v4 <> ''
         UNION
-        SELECT user_id, ip_v6 FROM user_sessions
-         WHERE user_id = ANY(%s) AND ip_v6 IS NOT NULL AND ip_v6 <> ''
+        SELECT u.newapi_user_id, us.ip_v6
+        FROM user_sessions us
+        JOIN users u ON u.id = us.user_id
+        WHERE u.newapi_user_id = ANY(%s) AND us.ip_v6 IS NOT NULL AND us.ip_v6 <> ''
         """,
         (user_ids, user_ids),
     )
     ip_map: dict = {}
     for uid, ip in rows or []:
-        ip_map.setdefault(uid, set()).add(str(ip))
+        ip_map.setdefault(int(uid), set()).add(str(ip))
     return ip_map
 
 
