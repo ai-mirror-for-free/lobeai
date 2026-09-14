@@ -23,6 +23,16 @@ granularity:
   - month   额外返回按自然月分桶（YYYY-MM）
   - week    额外返回按自然周分桶（YYYY-MM-DD）
 
+激活码口径（by_week/by_month 每桶的 recharged_by_activation_code）：
+  - 数据源：server a oneapi.activation_codes（lobeai 自建表，同库只读直查）
+  - 口径：used_at 非空（已核销）的码，按面值 quota 折算人民币，按 used_at
+    所在自然周/自然月分桶；与本请求其它字段共用同一汇率。
+  - 注意：该字段与 recharged（tokens 按 created_time 分桶）是两个独立口径，
+    续费累加不改 tokens.created_time，两者可能落在不同桶，因此不参与
+    recharged 求和，仅作为「激活码核销金额」对照值。
+  - 取整：与 recharged 同风格 —— 每桶先按 quota 求和，再折算人民币并
+    四舍五入到整元（整元取整后求和）。
+
 排除表：data/excluded_emails.json，{"emails": [...]}，仅限 claude code 套餐统计。
 
 扣除：claude code 累计充值需剔除邀请返利的假收入（claude_agent.invite_rewards.reward_quota），
@@ -217,6 +227,42 @@ def _cc_stats(db, excluded: list, granularity: str) -> dict:
     }
 
 
+def _activation_code_recharged_buckets(db, granularity: str, rate: float | None = None) -> dict:
+    """激活码核销金额分桶（人民币），返回 {bucket: rmb}
+
+    数据源：A 端 oneapi.activation_codes（lobeai 自建表，与 tokens 同库，直查）。
+    口径：used_at 非空 = 已核销，面值 quota 换算人民币；分桶按 used_at。
+
+    - quota 是「卖码当日汇率」折算并固化的额度（500000 quota = 1 USD），
+      这里用本轮统一汇率折算，与余额展示口径一致（<1% 误差，见
+      docs/debug/quota-rounding-20260819.md）。
+    - 取整：与 recharged 同风格，每桶按 quota 求和后折算并四舍五入到整元。
+    - 查询失败返回 {}，不影响主统计。
+    """
+    if granularity == "month":
+        bucket_expr = "to_char(date_trunc('month', used_at), 'YYYY-MM')"
+    elif granularity == "week":
+        bucket_expr = "to_char(date_trunc('week', used_at), 'YYYY-MM-DD')"
+    else:
+        return {}
+
+    try:
+        rows = db.execute_query(
+            f"SELECT {bucket_expr} AS bucket, COALESCE(SUM(quota), 0) "
+            f"FROM activation_codes WHERE used_at IS NOT NULL GROUP BY 1 ORDER BY 1"
+        ) or []
+    except Exception as e:
+        logger.error(f"[usage-summary] 激活码核销分桶查询失败: {e}")
+        return {}
+
+    buckets = {str(r[0]): int(round(_quota_to_rmb(int(r[1] or 0), rate))) for r in rows}
+    logger.info(
+        f"[usage-summary] 激活码核销分桶 granularity={granularity} "
+        f"buckets={len(buckets)} rmb={sum(buckets.values())}"
+    )
+    return buckets
+
+
 def get_usage_summary(granularity: str = "") -> dict:
     """平台套餐用量汇总入口（/api/admin/usage-summary 调用）
 
@@ -240,6 +286,7 @@ def get_usage_summary(granularity: str = "") -> dict:
     try:
         api = _api_stats(db, granularity)
         cc = _cc_stats(db, excluded, granularity)
+        ac_buckets = _activation_code_recharged_buckets(db, granularity, rate)
     except Exception as e:
         logger.error(f"[usage-summary] 查询失败: {e}")
         raise
@@ -299,12 +346,20 @@ def get_usage_summary(granularity: str = "") -> dict:
                 m = merged.setdefault(bk, {"recharged": 0, "consumed": 0.0})
                 m["consumed"] += _quota_to_rmb(quota, rate)
 
+        # 激活码核销金额：独立数据源/独立分桶依据（used_at），只补字段不参与求和
+        for bk, rmb in ac_buckets.items():
+            m = merged.setdefault(bk, {"recharged": 0, "consumed": 0.0})
+            m["recharged_by_activation_code"] = rmb
+
         key = "by_month" if granularity == "month" else "by_week"
         result[key] = [
             {
                 "bucket": bk,
                 "recharged": v["recharged"],
                 "consumed": round(v["consumed"], 2),
+                "recharged_by_activation_code": int(
+                    v.get("recharged_by_activation_code") or 0
+                ),
             }
             for bk, v in sorted(merged.items())
         ]
