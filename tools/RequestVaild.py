@@ -125,3 +125,30 @@ class InviteRewardsRequest(BaseModel):
 class InviteStatsRequest(BaseModel):
     """邀请统计 + 套利排查请求（仅管理员）"""
     include_excluded: bool = False  # 是否包含排除名单（测试号等）的绑定
+
+
+class ActivationCodeLookupRequest(BaseModel):
+    """激活码反查使用邮箱请求（仅管理员）
+
+    只读：按激活码解出 code_id → 查 A 端 activation_codes.used_by。
+    """
+    username: Optional[str] = None
+    password: Optional[str] = None
+    token: Optional[str] = None
+    code: str  # 激活码原文（base64(payload).base64(HMAC)）
+
+
+class ActivationCodeRevokeRequest(BaseModel):
+    """激活码额度清零 / 退回请求（仅管理员）
+
+    mode="reset"  清零该邮箱对应 key 的全部剩余额度（remain_quota=0）
+    mode="refund" 只退回该激活码的面额（最多扣到 0）
+    dry_run=True  只预览不写库
+    """
+    username: Optional[str] = None
+    password: Optional[str] = None
+    token: Optional[str] = None
+    code: str
+    mode: str  # reset | refund
+    dry_run: bool = False
+    reason: str = ""

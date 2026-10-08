@@ -86,3 +86,44 @@ SELECT "group", COUNT(*) AS alive_count
 -- -----------------------------------------------------------------------------
 -- （已迁移，无 DDL）
 
+-- -----------------------------------------------------------------------------
+-- 8) 【需人工执行】激活码额度清零 / 退回 审计表（A 端 oneapi 库）
+--    配套接口（仅管理员）：
+--      POST /api/admin/activation-code/lookup   按激活码反查使用邮箱
+--      POST /api/admin/activation-code/revoke   清零全部额度 / 只退回该码面额
+--    用途：
+--      a) 审计：谁（operator）在什么时候对哪个激活码（code_id）/哪个邮箱
+--         （email）做了清零或退回，操作前后额度各是多少；
+--      b) 幂等：mode='refund' 前先查本表，已有记录则拒绝，防重复扣额度。
+--         审计表不存在时接口会 fail-closed 拒绝执行（不会“无审计”地扣额度）。
+--    注意：本表在 A 端 oneapi 库（与 activation_codes 同库），不是 claude_agent 库。
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS activation_code_revocations (
+    id            BIGSERIAL    PRIMARY KEY,
+    code_id       VARCHAR(64)  NOT NULL,          -- 激活码 code_id（来自 payload）
+    email         VARCHAR(255) NOT NULL,          -- 被操作的 key 归属邮箱
+    mode          VARCHAR(16)  NOT NULL,          -- reset=清零全部 | refund=只退该码面额
+    code_quota    BIGINT       NOT NULL DEFAULT 0,-- 激活码面额（quota）
+    before_remain BIGINT       NOT NULL,          -- 操作前 remain_quota
+    after_remain  BIGINT       NOT NULL,          -- 操作后 remain_quota
+    deducted      BIGINT       NOT NULL DEFAULT 0,-- 实际扣减额度（不足额时小于 code_quota）
+    used_quota    BIGINT,                         -- 操作时该 key 的已消耗额度（只读留痕）
+    token_id      BIGINT,                         -- B 端 tokens.id
+    operator      VARCHAR(128),                   -- 操作管理员
+    reason        TEXT,                           -- 操作原因
+    created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+-- 按激活码反查审计记录（幂等检查 / 溯源）
+CREATE INDEX IF NOT EXISTS idx_acr_code_id ON activation_code_revocations (code_id);
+-- 按邮箱反查该用户被扣过的额度
+CREATE INDEX IF NOT EXISTS idx_acr_email   ON activation_code_revocations (email);
+-- 幂等硬约束：同一激活码只允许一条 refund 记录（reset 可多次，天然幂等）
+CREATE UNIQUE INDEX IF NOT EXISTS uq_acr_refund_code
+    ON activation_code_revocations (code_id) WHERE mode = 'refund';
+
+-- 自查：确认表与索引已建好
+-- SELECT column_name, data_type FROM information_schema.columns
+--  WHERE table_name = 'activation_code_revocations' ORDER BY ordinal_position;
+-- SELECT indexname FROM pg_indexes WHERE tablename = 'activation_code_revocations';
+

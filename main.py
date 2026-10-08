@@ -5,7 +5,7 @@ from services.NewAPIClient import NewAPIClient
 from tools.LoggerManager import LoggerManager
 from tools.RequestVaild import *
 from tools.VerifyAdmin import get_admin_client, _check_admin_credentials
-from tools.AdminTokenManager import issue_token, TOKEN_TTL
+from tools.AdminTokenManager import issue_token, TOKEN_TTL, verify_token
 from middleware.ProtectionMiddleware import ProtectionMiddleware
 
 # 初始化 FastAPI 应用
@@ -388,6 +388,57 @@ async def invite_stats(
     from services.InviteStats import get_invite_stats
 
     return get_invite_stats(include_excluded=request.include_excluded)
+
+
+# ==================== 激活码运维（管理员） ====================
+
+
+@app.post("/api/admin/activation-code/lookup")
+async def activation_code_lookup(
+    request: ActivationCodeLookupRequest,
+    admin_client: NewAPIClient = Depends(get_admin_client),
+):
+    """
+    【管理员】按激活码反查使用邮箱
+
+    只读：激活码 → code_id → A 端 activation_codes.used_by
+    （谁用了、什么时候用的、面额多少）。未使用的码返回 used=false。
+    """
+    from services.ActivationCodeRevoke import lookup_activation_code
+
+    return lookup_activation_code(request.code)
+
+
+@app.post("/api/admin/activation-code/revoke")
+async def activation_code_revoke(
+    request: ActivationCodeRevokeRequest,
+    req: Request,
+    admin_client: NewAPIClient = Depends(get_admin_client),
+):
+    """
+    【管理员】按激活码清零 / 退回对应 key 的额度
+
+    - mode=reset   清零该邮箱对应 key 的全部剩余额度（remain_quota=0）
+    - mode=refund  只退回该激活码的面额（最多扣到 0；同一码只能退一次）
+    - dry_run=true 只预览不写库
+
+    只改 B 端 tokens.remain_quota（经 server_b /internal/quota/adjust），
+    used_quota 保留、不禁用 key；操作写入 activation_code_revocations 审计表。
+    """
+    from services.ActivationCodeRevoke import revoke_activation_code
+
+    auth = req.headers.get("Authorization", "")
+    token = auth[len("Bearer "):].strip() if auth.startswith("Bearer ") else ""
+    entry = verify_token(token) if token else None
+    operator = (entry or {}).get("username") or request.username or "unknown"
+
+    return revoke_activation_code(
+        code=request.code,
+        mode=request.mode,
+        operator=operator,
+        reason=request.reason,
+        dry_run=request.dry_run,
+    )
 
 # ==================== 额度查询 ====================
 
