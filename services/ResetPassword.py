@@ -45,23 +45,22 @@ def reset_password(username: str, email: str, req: Request) -> dict:
     ip_reset_attempts[ip] = [t for t in ip_reset_attempts[ip] if now - t < RESET_WINDOW]
 
     # 校验用户名和邮箱（从 NewAPI users 表查询，排除管理员 role=100）
-    # 用户名匹配规则：精确相等，或（库用户名长度>=2 时）双向包含；
-    # POSITION 不解析 %/_ 通配符，且全部走 psycopg2 参数化，防注入
+    # 匹配规则：
+    #   - 邮箱：忽略大小写比较（lower）
+    #   - 用户名：两侧各取前 4 个字符、忽略大小写比较；用户名不足 4 字符时
+    #     等价于必须完整写对（用户输入多打字符即不通过）
+    #   - 两侧先 btrim 去掉首尾空格
+    # 全部走 psycopg2 参数化，防注入
     newapi_db = NewApiDatabaseManager()
     newapi_db.connect()
     result = newapi_db.execute_query(
         """
         SELECT id FROM users
-        WHERE email = %s AND role != 100
+        WHERE lower(email) = lower(%s) AND role != 100
           AND username IS NOT NULL AND username <> ''
-          AND (
-            username = %s
-            OR (length(username) >= 2
-                AND (POSITION(%s IN username) > 0
-                  OR POSITION(username IN %s) > 0))
-          )
+          AND lower(left(btrim(username), 4)) = lower(left(btrim(%s), 4))
         """,
-        (email, username, username, username),
+        (email, username),
     )
 
     if not result:
@@ -79,8 +78,10 @@ def reset_password(username: str, email: str, req: Request) -> dict:
         return {"message": f"用户名或邮箱不正确，您还有 {attempts_left} 次尝试机会"}
 
     # 校验通过：删除 NewAPI 用户（排除管理员）
+    # 注意：email 匹配必须与上面的校验条件保持一致（同样忽略大小写），
+    # 否则用户输入大写邮箱时会出现「校验通过但删不到人」的不一致
     newapi_db.execute_command(
-        "DELETE FROM users WHERE email = %s AND role != 100", (email,)
+        "DELETE FROM users WHERE lower(email) = lower(%s) AND role != 100", (email,)
     )
     newapi_db.disconnect()
 
