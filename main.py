@@ -495,6 +495,14 @@ async def health_check():
     return {"status": "healthy"}
 
 
+# ==================== Tavily key 池管理（独立模块，见 services/TavilyKeyAdmin.py）====================
+# 管理员后台（home-admin）→ /api/admin/tavily/* → server_b /tavily/*
+# key 真源在 B 端 claude_rag.tavily_keys；本层只做鉴权 + 转发，不落任何 key 明文。
+from services.TavilyKeyAdmin import register_tavily_routes
+
+register_tavily_routes(app)
+
+
 if __name__ == "__main__":
     import uvicorn
 
