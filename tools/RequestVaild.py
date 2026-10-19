@@ -62,13 +62,6 @@ class ActivationCodeStatsRequest(BaseModel):
     password: Optional[str] = None
 
 
-class AdminOpenRouterSearchRequest(BaseModel):
-    """管理员搜索 OpenRouter 模型请求"""
-    username: Optional[str] = None
-    password: Optional[str] = None
-    q: str  # 搜索的模型名称
-
-
 class ResetPasswordRequest(BaseModel):
     """重置密码请求（忘记密码后删除账号）"""
     username: str

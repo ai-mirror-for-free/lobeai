@@ -194,37 +194,6 @@ async def batch_create_tokens(
     )
 
 
-@app.post("/api/admin/openrouter/models")
-async def get_openrouter_models(
-    request: AdminAuthRequest,
-    admin_client: NewAPIClient = Depends(get_admin_client)
-):
-    """
-    【管理员】获取 OpenRouter 所有模型列表（带缓存）
-    """
-    from services.OpenRouterPrice import get_all_models, format_model_info
-
-    models = get_all_models()
-    return [format_model_info(m) for m in models]
-
-
-@app.post("/api/admin/openrouter/search")
-async def search_openrouter_models(
-    request: AdminOpenRouterSearchRequest,
-    admin_client: NewAPIClient = Depends(get_admin_client)
-):
-    """
-    【管理员】搜索 OpenRouter 模型
-
-    Args:
-        model_name: 搜索的模型名称
-    """
-    from services.OpenRouterPrice import search_models, format_model_info
-
-    models = search_models(request.q)
-    return [format_model_info(m) for m in models]
-
-
 @app.post("/api/admin/activation-codes/stats")
 async def get_activation_codes_stats(
     request: ActivationCodeStatsRequest,
@@ -298,21 +267,6 @@ async def usage_summary(
     from services.UsageSummary import get_usage_summary
 
     return get_usage_summary(granularity=request.granularity)
-
-
-@app.post("/api/admin/price")
-async def price_query_page(
-    request: AdminAuthRequest,
-    admin_client: NewAPIClient = Depends(get_admin_client)
-):
-    """
-    【管理员】OpenRouter 模型价格查询页面（带管理员认证）
-    """
-    import os
-    from fastapi.responses import FileResponse
-
-    template_path = os.path.join(os.path.dirname(__file__), "templates", "price_query.html")
-    return FileResponse(template_path)
 
 
 @app.post("/api/admin/text")
