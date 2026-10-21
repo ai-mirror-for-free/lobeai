@@ -10,7 +10,7 @@
     url = get_env("NEWAPI_URL", "http://localhost:25142")
     admin_user = get_env("ADMIN_USERNAME")
 
-独立脚本直接运行（python func/SyncApiJson.py）也能正常读取，
+独立脚本直接运行（如 python tools/xxx.py）也能正常读取，
 因为 ConfigManager 用 __file__ 相对定位项目根，不依赖 cwd。
 """
 

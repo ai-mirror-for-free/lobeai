@@ -29,8 +29,7 @@ def clear_cache():
     """
     清除 api.json 加载缓存
 
-    同步脚本（func/SyncApiJson.py）写回 api.json 后调用，
-    避免同进程内后续 load_api_config() 读到旧数据。
+    外部改写 data/api.json 后调用，避免同进程内后续 load_api_config() 读到旧数据。
     """
     global _cache
     _cache = None
