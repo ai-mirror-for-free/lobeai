@@ -32,12 +32,14 @@ def batch_create_tokens(
     """
     # ---------------------------------------------------------------
     # Step 1: 加载套餐定义并校验 package key
+    # 注意：token 不再设置模型白名单（model_limits），渠道里有什么模型就能用什么；
+    # 这里仍校验 package 是为了 1) 命名 batch-{package}-... 2) image 套餐走独立 base_url
     # ---------------------------------------------------------------
     try:
         api_data = load_api_config()
     except Exception as e:
         logger.error(f"无法加载 api.json: {e}")
-        return {"status": False, "error": f"无法加载模型列表配置文件: {e}"}
+        return {"status": False, "error": f"无法加载套餐配置文件: {e}"}
 
     if package not in api_data:
         valid_keys = list(api_data.keys())
@@ -46,9 +48,6 @@ def batch_create_tokens(
             "status": False,
             "error": f"无效的套餐类型: {package}，有效值为: {', '.join(valid_keys)}",
         }
-
-    model_list = api_data[package]
-    model_limits_str = ",".join(model_list)
 
     # ---------------------------------------------------------------
     # Step 2: 获取汇率并计算额度
@@ -76,8 +75,8 @@ def batch_create_tokens(
                     remain_quota=remain_quota,
                     expired_time=-1,           # 永不过期
                     unlimited_quota=False,
-                    model_limits_enabled=True,
-                    model_limits=model_limits_str,
+                    model_limits_enabled=False,  # 不限制模型：渠道可用什么就用什么
+                    model_limits="",
                     group="api",
                 )
             )
@@ -92,7 +91,7 @@ def batch_create_tokens(
                 f"api_key为{token_key}  \n"
                 f"您购买的套餐类型为{package}\n"
                 f"价格为{price}元\n"
-                f"可使用如下模型{model_limits_str}\n"
+                f"请前往 https://www.chat-keeper.com/experience 查询用量和测试key的有效性。\n"
             )
             created_tokens.append(formatted)
             logger.info(f"已创建令牌 #{i}: {token_name}")
