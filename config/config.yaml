@@ -37,6 +37,7 @@ tickets:
     - "2277248178@qq.com"
     - "yf13755921935@gmail.com"
     - "805928179@qq.com"
+    - "1178574705@qq.com"
   # db_host/db_port 留空 = 复用 database.host/port（同实例）；本地测试在 config_dev.yaml 覆盖
   db_host: ""
   db_port: ""

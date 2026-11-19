@@ -42,6 +42,7 @@ tickets:
     - "2277248178@qq.com"
     - "yf13755921935@gmail.com"
     - "805928179@qq.com"
+    - "1178574705@qq.com"
   db_host: "127.0.0.1"
   db_port: 2544
   db_name: "claude_agent"
