@@ -7,3 +7,4 @@ email-validator
 cryptography
 uvicorn
 pyyaml
+python-multipart

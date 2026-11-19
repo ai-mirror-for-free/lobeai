@@ -14,9 +14,13 @@ admin:
   email: "yf13755921935@gmail.com"
 
 # --- PostgreSQL（new-api oneapi 库）---
+# 2026-11-19：本地测试全部走本地 pg（pg-claude-dev 容器 127.0.0.1:2544），
+# 不再连 A 端数据库、也不需要 SSH 隧道。
+# 本地库名是 oneapi_rc45（new-api-dev 使用的库），不是线上默认的 oneapi。
 database:
-  host: "154.64.231.128"
-  port: 2543
+  host: "127.0.0.1"
+  port: 2544
+  db_name: "oneapi_rc45"
   username: "postgres"
 
 # --- NewAPI 管理端 ---
@@ -29,3 +33,35 @@ newapi:
 # lobeai 的 InviteService.reward 必须过 server_b HTTP，dev 用本机才能命中本地 /internal/invite/bonus
 server_b:
   url: "http://127.0.0.1:9000"
+
+# --- 工单 / 反馈（灰度）---
+# dev 把工单表指向本机 pg-claude-dev 容器（127.0.0.1:2544），**不碰线上库**
+tickets:
+  enabled: true
+  allowed_emails:
+    - "2277248178@qq.com"
+    - "yf13755921935@gmail.com"
+    - "805928179@qq.com"
+  db_host: "127.0.0.1"
+  db_port: 2544
+  db_name: "claude_agent"
+  attachment_dir: "data/tickets"
+  retention_days: 30
+  auto_close_days: 7
+  max_files_per_message: 6
+  max_file_mb: 10
+  max_message_total_mb: 30
+  rate_limit_per_hour: 50        # 本地测试放开（线上 config.yaml 仍是 5）
+  attachment_url_ttl_hours: 24
+
+gotify:
+  enabled: false          # 本地不推 gotify（避免误发）；验收时临时改 true
+  url: "https://gotify.chat-keeper.com"   # 本地走公网反代（线上用 127.0.0.1:25800）
+  app_token: "gAAAAABq_o0RB6Hqx2C5lB4PFQUbcFOOwifm-ydUgWyKYTWxfWfxRShmUAnrcNS6i_B3OUwmtS-ELvOUuWrQNsKGNAiSrP84sA=="
+  admin_ticket_url: "http://192.168.28.13:3000/#/tickets"
+  clients:
+    yangfan: "gAAAAABq_o0Rv_4H3s7cyd_xY6RjEC0Hls73AXWlTnZUXSDE3kTTRR-SZQNOIcmfiKY1_vlFX_WscZUy2dDA8SNSmORxPeHyhQ=="
+
+# 本地 claude_agent 跑在 25145（见 local-test-env 技能）
+claude_agent:
+  url: "http://127.0.0.1:25145"

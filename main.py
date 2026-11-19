@@ -456,6 +456,13 @@ from services.TavilyKeyAdmin import register_tavily_routes
 
 register_tavily_routes(app)
 
+# ==================== 工单 / 反馈（独立模块，见 services/TicketRoutes.py）====================
+# 用户端 /api/tickets/*（门户 /feedback，需门户 access token）
+# 管理端 /api/admin/tickets/*（home-admin，需 lobeai 管理员 token）
+from services.TicketRoutes import register_ticket_routes
+
+register_ticket_routes(app)
+
 
 if __name__ == "__main__":
     import uvicorn

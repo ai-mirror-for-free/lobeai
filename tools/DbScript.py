@@ -3,7 +3,7 @@ import psycopg2
 from dotenv import load_dotenv
 from tools.LoggerManager import LoggerManager
 from tools.password_encryption import get_decrypted_password
-from tools.ConfigManager import get_env
+from tools.ConfigManager import get_env, get_config
 
 class DatabaseManager:
     """管理 PostgreSQL 数据库的操作类
@@ -13,7 +13,7 @@ class DatabaseManager:
     (否则会污染同进程内所有 NewApiDatabaseManager() 调用, 例如 ActivationCodeManager)。
     """
 
-    def __init__(self, env_path=".env", db_name="oneapi",
+    def __init__(self, env_path=".env", db_name=None,
                  db_host=None, db_port=None, db_user=None, db_password=None):
         load_dotenv(env_path)
         # 默认 env, 任一字段可被显式参数 override
@@ -25,7 +25,7 @@ class DatabaseManager:
             self.password = db_password
         else:
             self.password = get_decrypted_password("DB_PASSWORD_ENCRYPTED")
-        self.dbname = db_name
+        self.dbname = db_name or get_config("database.db_name", "oneapi")
         self.conn = None
         self.logger = LoggerManager()
 
@@ -37,7 +37,9 @@ class DatabaseManager:
                 port=self.port,
                 user=self.user,
                 password=self.password,
-                dbname=self.dbname
+                dbname=self.dbname,
+                # 必须设：否则地址不可达时会卡在 TCP 超时，把 FastAPI 事件循环堵死
+                connect_timeout=8,
             )
             self.logger.info("数据库连接成功")
         except Exception as e:
@@ -91,7 +93,7 @@ class NewApiDatabaseManager(DatabaseManager):
     默认连默认 NewAPI 的 oneapi 库。LOCAL 副本需调用方显式传 db_host 等 override,
     不自动读 DB_*_LOCAL env (原因见 DatabaseManager docstring)。
     """
-    def __init__(self, env_path=".env", db_name="oneapi",
+    def __init__(self, env_path=".env", db_name=None,
                  db_host=None, db_port=None, db_user=None, db_password=None):
         super().__init__(
             env_path, db_name,

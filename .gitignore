@@ -213,3 +213,5 @@ test
 pricing_plan.json
 usd_cny_rate.json
 data/text
+# 工单附件（30 天保留期由 cron 清理，不入库）
+data/tickets

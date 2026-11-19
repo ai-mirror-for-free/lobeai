@@ -75,6 +75,15 @@ def _get_yaml(path: str, default=None):
     return value if value is not None else default
 
 
+def get_config(path: str, default=None):
+    """读取 yaml 任意点分路径的非密钥配置（如 'tickets.allowed_emails'）。
+
+    get_env 只覆盖 _ENV_TO_YAML_PATH 白名单里的标量项；列表/数值型配置
+    （工单灰度名单、大小限制等）走这个函数。密钥仍然只允许从 env 读。
+    """
+    return _get_yaml(path, default)
+
+
 def get_env(key: str, default=None):
     """统一读取配置：os.environ 优先，其次 yaml（仅限非密钥项）"""
     # 1. 环境变量优先（.env 或进程注入）

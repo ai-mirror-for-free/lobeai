@@ -16,6 +16,7 @@ admin:
 database:
   host: "localhost"
   port: 2543
+  db_name: "oneapi"
   username: "postgres"
 
 # --- NewAPI 管理端 ---
@@ -26,3 +27,41 @@ newapi:
 # --- server_b 编排器 ---
 server_b:
   url: "https://mirror.chat-keeper.com"
+
+# --- 工单 / 反馈（灰度）---
+# 表结构：claude_agent 库的独立 schema `ticket`（DDL 见 docs/schema_tickets.sql，手动执行）
+tickets:
+  enabled: true
+  # 灰度名单（小写）；不在名单里：入口不显示、直接调接口 403
+  allowed_emails:
+    - "2277248178@qq.com"
+    - "yf13755921935@gmail.com"
+    - "805928179@qq.com"
+  # db_host/db_port 留空 = 复用 database.host/port（同实例）；本地测试在 config_dev.yaml 覆盖
+  db_host: ""
+  db_port: ""
+  db_name: "claude_agent"
+  attachment_dir: "data/tickets"
+  retention_days: 30              # 关单后附件保留天数（按 closed_at 起算）
+  auto_close_days: 7              # 管理员回复后 N 天用户无回应 → 自动关单（open 状态不自动关）
+  max_files_per_message: 6
+  max_file_mb: 10
+  max_message_total_mb: 30
+  rate_limit_per_hour: 5          # 单个邮箱每小时最多新建工单数
+  attachment_url_ttl_hours: 24    # 附件签名 URL 有效期
+
+# --- gotify 运维通知（新工单 / 用户追问推给管理员）---
+# token 一律存密文：ENCRYPTION_KEY 加密，生成方式见 tools/password_encryption.py
+# 强度用消息 priority 区分（0 静音 / 5 正常 / 10 高强调），单个 app 即可
+gotify:
+  enabled: true
+  url: "http://127.0.0.1:25800"
+  app_token: "gAAAAABq_o0RB6Hqx2C5lB4PFQUbcFOOwifm-ydUgWyKYTWxfWfxRShmUAnrcNS6i_B3OUwmtS-ELvOUuWrQNsKGNAiSrP84sA=="
+  admin_ticket_url: "https://admin.chat-keeper.com/A4HQiNnQBJ#/tickets"
+  # 接收端 client token：只用于自检回读，新增接收人在这里追加
+  clients:
+    yangfan: "gAAAAABq_o0Rv_4H3s7cyd_xY6RjEC0Hls73AXWlTnZUXSDE3kTTRR-SZQNOIcmfiKY1_vlFX_WscZUy2dDA8SNSmORxPeHyhQ=="
+
+# --- 门户用户身份校验（工单接口专用，只调 /api/v1/auth/me，不碰聊天链路）---
+claude_agent:
+  url: "http://127.0.0.1:25145"
