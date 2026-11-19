@@ -53,6 +53,13 @@ tickets:
   max_message_total_mb: 30
   rate_limit_per_hour: 50        # 本地测试放开（线上 config.yaml 仍是 5）
   attachment_url_ttl_hours: 24
+  poll:
+    user_overview: 20
+    user_detail: 10
+    admin_list: 15
+    admin_detail: 10
+    max_interval: 60
+    idle_seconds: 600
 
 gotify:
   enabled: false          # 本地不推 gotify（避免误发）；验收时临时改 true

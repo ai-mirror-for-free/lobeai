@@ -22,11 +22,22 @@ from services.TicketService import (
     TicketError,
     _prepare_files,
     _int,
+    poll_settings,
 )
 
 logger = LoggerManager(log_file="ticket.log")
 
 ADMIN_PAGE_SIZE = 20
+
+# 状态统计 SQL（stats() 与 list_tickets() 共用，避免前端轮询多打一个请求）
+_STATS_SQL = """SELECT
+                   COUNT(*) FILTER (WHERE status = 'open')          AS open_count,
+                   COUNT(*) FILTER (WHERE status = 'replied')       AS replied_count,
+                   COUNT(*) FILTER (WHERE status = 'closed')        AS closed_count,
+                   COUNT(*) FILTER (WHERE admin_unread > 0)         AS unread_count,
+                   COUNT(*) FILTER (WHERE user_deleted_at IS NOT NULL) AS hidden_count,
+                   COUNT(*)                                         AS total_count
+                 FROM ticket.tickets"""
 
 
 def _iso(dt) -> str | None:
@@ -120,11 +131,17 @@ def list_tickets(keyword: str = "", status: str = "", category: str = "",
         )
         rows = cur.fetchall()
 
+        # 顺带返回状态统计：前端轮询只发一个 list 请求，不再单独打 stats
+        cur.execute(_STATS_SQL)
+        stats_row = cur.fetchone()
+
     return {
         "items": [_row_to_item(r) for r in rows],
         "total": total,
         "page": page,
         "size": size,
+        "stats": {k: int(v or 0) for k, v in stats_row.items()},
+        "poll_seconds": poll_settings("admin"),
     }
 
 
@@ -287,16 +304,7 @@ def set_status(ticket_id: int, status: str, operator: str) -> dict:
 
 def stats() -> dict:
     with ticket_cursor() as cur:
-        cur.execute(
-            """SELECT
-                   COUNT(*) FILTER (WHERE status = 'open')     AS open_count,
-                   COUNT(*) FILTER (WHERE status = 'replied')  AS replied_count,
-                   COUNT(*) FILTER (WHERE status = 'closed')   AS closed_count,
-                   COUNT(*) FILTER (WHERE admin_unread > 0)    AS unread_count,
-                   COUNT(*) FILTER (WHERE user_deleted_at IS NOT NULL) AS hidden_count,
-                   COUNT(*)                                    AS total_count
-                 FROM ticket.tickets"""
-        )
+        cur.execute(_STATS_SQL)
         row = cur.fetchone()
     return {k: int(v or 0) for k, v in row.items()}
 

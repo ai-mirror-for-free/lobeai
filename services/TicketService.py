@@ -79,6 +79,34 @@ def is_allowed(email: str) -> bool:
     return email.strip().lower() in allowed_emails()
 
 
+def poll_settings(mode: str = "user") -> dict:
+    """前端轮询参数（秒），改 config.yaml 即可调速，不用重新构建前端。
+
+    primary  列表/概览的基准间隔
+    detail   打开的详情（工单对话）的基准间隔
+    max_interval  无变化退避后的封顶间隔
+    idle_seconds  多长时间无用户操作就停表（有人动才恢复）
+
+    背景：A 端服务器较弱，轮询必须“人不在就不烧请求”。前端拿到这组参数后
+    按「有变化/有操作 → 基准间隔；连续无变化 → 翻倍；长时间无操作 → 暂停」调度。
+    """
+
+    def _cfg(key: str, default: int, lo: int = 5, hi: int = 3600) -> int:
+        try:
+            value = int(get_config(f"tickets.poll.{key}", default) or default)
+        except (TypeError, ValueError):
+            value = default
+        return max(lo, min(hi, value))
+
+    admin = mode == "admin"
+    return {
+        "primary": _cfg("admin_list" if admin else "user_overview", 15 if admin else 20),
+        "detail": _cfg("admin_detail" if admin else "user_detail", 10),
+        "max_interval": _cfg("max_interval", 60, 10),
+        "idle_seconds": _cfg("idle_seconds", 600, 60),
+    }
+
+
 def require_allowed(email: str) -> None:
     if not is_enabled():
         raise TicketError("反馈功能暂未开放", 403)
@@ -150,14 +178,14 @@ def _attachment_row(row: dict) -> dict:
 def entry_info(email: str) -> dict:
     """前端据此决定是否显示反馈入口。非白名单也返回 200，只是 enabled=False。"""
     if not is_enabled() or not is_allowed(email):
-        return {"enabled": False, "unread": 0, "email": email}
+        return {"enabled": False, "unread": 0, "email": email, "poll_seconds": poll_settings("user")}
     with ticket_cursor() as cur:
         cur.execute(
             "SELECT COALESCE(SUM(user_unread), 0) AS unread FROM ticket.tickets WHERE user_email = %s",
             (email,),
         )
         unread = int(cur.fetchone()["unread"] or 0)
-    return {"enabled": True, "unread": unread, "email": email}
+    return {"enabled": True, "unread": unread, "email": email, "poll_seconds": poll_settings("user")}
 
 
 # ─── 列表 ────────────────────────────────────────────────────────────
@@ -190,6 +218,14 @@ def list_tickets(email: str, page=1, size=DEFAULT_PAGE_SIZE) -> dict:
             (email, size, offset),
         )
         rows = cur.fetchall()
+        # 未读数顺带返回：前端轮询只要这一个请求（省掉单独的 entry 请求）
+        cur.execute(
+            """SELECT COALESCE(SUM(user_unread), 0) AS unread
+                 FROM ticket.tickets
+                WHERE user_email = %s AND user_deleted_at IS NULL""",
+            (email,),
+        )
+        unread = int(cur.fetchone()["unread"] or 0)
     items = []
     for row in rows:
         item = _ticket_row(row)
@@ -197,7 +233,15 @@ def list_tickets(email: str, page=1, size=DEFAULT_PAGE_SIZE) -> dict:
         item["message_count"] = int(row.get("message_count") or 0)
         item["attachment_count"] = int(row.get("attachment_count") or 0)
         items.append(item)
-    return {"items": items, "total": total, "page": page, "size": size}
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "size": size,
+        "unread": unread,
+        "enabled": True,
+        "poll_seconds": poll_settings("user"),
+    }
 
 
 # ─── 详情 ────────────────────────────────────────────────────────────

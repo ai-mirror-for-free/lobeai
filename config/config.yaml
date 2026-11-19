@@ -49,6 +49,15 @@ tickets:
   max_message_total_mb: 30
   rate_limit_per_hour: 5          # 单个邮箱每小时最多新建工单数
   attachment_url_ttl_hours: 24    # 附件签名 URL 有效期
+  # 前端轮询（秒）：A 端服务器较弱，默认“有人看才轮询、无变化退避、长时间无操作停表”
+  # 前端从 /api/tickets 响应里的 poll_seconds 读取，改这里即可调速，不用重新构建前端
+  poll:
+    user_overview: 20        # 门户反馈列表/未读数
+    user_detail: 10          # 门户打开的工单对话
+    admin_list: 15           # 管理端工单列表+统计
+    admin_detail: 10         # 管理端打开的工单对话
+    max_interval: 60         # 连续无变化时的封顶间隔
+    idle_seconds: 600        # 无鼠标/键盘操作多久后停表（有操作立即恢复）
 
 # --- gotify 运维通知（新工单 / 用户追问推给管理员）---
 # token 一律存密文：ENCRYPTION_KEY 加密，生成方式见 tools/password_encryption.py
