@@ -16,7 +16,8 @@ admin:
 # --- PostgreSQL（new-api oneapi 库）---
 # 2026-11-19：本地测试全部走本地 pg（pg-claude-dev 容器 127.0.0.1:2544），
 # 不再连 A 端数据库、也不需要 SSH 隧道。
-# 本地库名是 oneapi_rc45（new-api-dev 使用的库），不是线上默认的 oneapi。
+# 本地库名是 oneapi_rc45（new-api-dev 使用的库，历史名，2026-11-20 起该实例已换 rc.51 镜像但库名未改），
+# 不是线上默认的 oneapi。
 database:
   host: "127.0.0.1"
   port: 2544
