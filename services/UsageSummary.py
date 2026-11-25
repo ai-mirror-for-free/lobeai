@@ -27,9 +27,13 @@ granularity:
   - 数据源：server a oneapi.activation_codes（lobeai 自建表，同库只读直查）
   - 口径：used_at 非空（已核销）的码，按面值 quota 折算人民币，按 used_at
     所在自然周/自然月分桶；与本请求其它字段共用同一汇率。
+  - 排除表与 claude code 充值口径一致（同一批内部/测试邮箱两边同时剔除）。
   - 注意：该字段与 recharged（tokens 按 created_time 分桶）是两个独立口径，
     续费累加不改 tokens.created_time，两者可能落在不同桶，因此不参与
     recharged 求和，仅作为「激活码核销金额」对照值。
+  - 该口径**不校验 B 端 token 是否还存在**（跨库校验需要 server_b 新增接口，
+    2026-11-25 评估后放弃）：已注销账号的残留码行由 user-cleanup 技能负责
+    整行删除（见 .agents/skills/user-cleanup/references/pitfalls.md §1b）。
   - 取整：与 recharged 同风格 —— 每桶先按 quota 求和，再折算人民币并
     四舍五入到整元（整元取整后求和）。
 
@@ -227,7 +231,8 @@ def _cc_stats(db, excluded: list, granularity: str) -> dict:
     }
 
 
-def _activation_code_recharged_buckets(db, granularity: str, rate: float | None = None) -> dict:
+def _activation_code_recharged_buckets(db, granularity: str, rate: float | None = None,
+                                       excluded: list | None = None) -> dict:
     """激活码核销金额分桶（人民币），返回 {bucket: rmb}
 
     数据源：A 端 oneapi.activation_codes（lobeai 自建表，与 tokens 同库，直查）。
@@ -236,6 +241,9 @@ def _activation_code_recharged_buckets(db, granularity: str, rate: float | None 
     - quota 是「卖码当日汇率」折算并固化的额度（500000 quota = 1 USD），
       这里用本轮统一汇率折算，与余额展示口径一致（<1% 误差，见
       docs/debug/quota-rounding-20260819.md）。
+    - 排除表（data/excluded_emails.json）与本请求的充值口径保持一致：
+      同一批内部/测试邮箱在 tokens 侧被剔除后，激活码侧也必须剔除，否则
+      两列差额会凭空多出这部分金额（2026-11-25 实测差 ¥2,299）。
     - 取整：与 recharged 同风格，每桶按 quota 求和后折算并四舍五入到整元。
     - 查询失败返回 {}，不影响主统计。
     """
@@ -246,10 +254,18 @@ def _activation_code_recharged_buckets(db, granularity: str, rate: float | None 
     else:
         return {}
 
+    where = "used_at IS NOT NULL"
+    params: list = []
+    if excluded:
+        placeholders = ",".join(["%s"] * len(excluded))
+        where += f" AND lower(used_by) NOT IN ({placeholders})"
+        params = list(excluded)
+
     try:
         rows = db.execute_query(
             f"SELECT {bucket_expr} AS bucket, COALESCE(SUM(quota), 0) "
-            f"FROM activation_codes WHERE used_at IS NOT NULL GROUP BY 1 ORDER BY 1"
+            f"FROM activation_codes WHERE {where} GROUP BY 1 ORDER BY 1",
+            params or None,
         ) or []
     except Exception as e:
         logger.error(f"[usage-summary] 激活码核销分桶查询失败: {e}")
@@ -286,7 +302,7 @@ def get_usage_summary(granularity: str = "") -> dict:
     try:
         api = _api_stats(db, granularity)
         cc = _cc_stats(db, excluded, granularity)
-        ac_buckets = _activation_code_recharged_buckets(db, granularity, rate)
+        ac_buckets = _activation_code_recharged_buckets(db, granularity, rate, excluded)
     except Exception as e:
         logger.error(f"[usage-summary] 查询失败: {e}")
         raise
