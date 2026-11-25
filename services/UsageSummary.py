@@ -30,8 +30,22 @@ api 套餐口径（2026-11-25 起，见 decisions.md D-035）：
   - 理由：api 套餐 token 全部挂在管理员账号（批量建 key 机制），无法区分
     「自用测试」与「卖给客户」，且与激活码（claude code 专属）口径无关；
     计入合计会让「充值 vs 激活码充值」永远差一笔 api 金额。
+  - by_plan 行结构（D-036）：claude code = 激活码核销口径；另有一行
+    「其他来源（直充/返利/扣减）」= tokens 口径 − 激活码口径（一个总数，
+    不再分期）。两者相加 = tokens 真实口径，也就是 summary 的合计。
   - 恢复方式：把 `_api_stats(...)` 调用改回 `(db, granularity)` 并把 api 加回
     summary 求和与 merged 合成（git 历史里有两处唯一入口）。
+
+分桶口径（D-036，2026-11-25）：
+  - **充值只有一列，按激活码核销时间（`used_at`）分桶**。旧实现按 token
+    `created_time` 分桶是错的：续费不改 `created_time`，老用户在任意时间续的
+    额度都会被算到“首次建 token”那一周；区间视图下这部分直接落在区间外
+    （实测 08-24 起的区间里充值 ¥42,416 vs 激活码 ¥50,171，差 ¥7,755）。
+  - **消耗按 token `created_time` 分桶**（≈ 用户首次激活/注册时间）：实测
+    594 个有 token 的用户中仅 10 个“注册周 ≠ token 周”，涉及消耗 0.95%，
+    故不为此引入 per-email 跨库接口；B 端 `logs` 已被清理，也无法回溯。
+  - 字段兼容：桶里 `recharged` 与 `recharged_by_activation_code` 现在同值，
+    旧前端仍可正常渲染（前端已去掉重复的「充值」列）。
 
 激活码口径（by_week/by_month 每桶的 recharged_by_activation_code）：
   - 数据源：server a oneapi.activation_codes（lobeai 自建表，同库只读直查）
@@ -69,6 +83,7 @@ EXCLUDED_FILE = Path(__file__).resolve().parent.parent / "data" / "excluded_emai
 # 套餐类型
 API = "api"
 CLAUDE_CODE = "claude code"
+OTHER_SOURCE = "其他来源（直充/返利/扣减）"
 
 
 def _get_agent_db():
@@ -279,6 +294,13 @@ def _activation_code_recharged_buckets(db, granularity: str, rate: float | None 
         ) or []
     except Exception as e:
         logger.error(f"[usage-summary] 激活码核销分桶查询失败: {e}")
+        # 失败后必须 rollback：否则同一连接后续查询全部报
+        # "current transaction is aborted"（本地缺表时踩过）
+        try:
+            if db.conn:
+                db.conn.rollback()
+        except Exception:
+            pass
         return {}
 
     buckets = {str(r[0]): int(round(_quota_to_rmb(int(r[1] or 0), rate))) for r in rows}
@@ -287,6 +309,35 @@ def _activation_code_recharged_buckets(db, granularity: str, rate: float | None 
         f"buckets={len(buckets)} rmb={sum(buckets.values())}"
     )
     return buckets
+
+
+def _activation_code_total(db, excluded: list, rate: float | None = None) -> int:
+    """激活码已核销面值总额（人民币，整元）——与分桶同口径（同排除表）
+
+    仅取总额（不分桶），供 by_plan 的「claude code 充值」行使用。
+    失败返回 0，不影响主统计。
+    """
+    where = "used_at IS NOT NULL"
+    params: list = []
+    if excluded:
+        placeholders = ",".join(["%s"] * len(excluded))
+        where += f" AND lower(used_by) NOT IN ({placeholders})"
+        params = list(excluded)
+    try:
+        rows = db.execute_query(
+            f"SELECT COALESCE(SUM(quota), 0) FROM activation_codes WHERE {where}",
+            params or None,
+        ) or []
+    except Exception as e:
+        logger.error(f"[usage-summary] 激活码总额查询失败: {e}")
+        try:
+            if db.conn:
+                db.conn.rollback()
+        except Exception:
+            pass
+        return 0
+    quota = int(rows[0][0] or 0) if rows else 0
+    return int(round(_quota_to_rmb(quota, rate)))
 
 
 def get_usage_summary(granularity: str = "") -> dict:
@@ -314,6 +365,7 @@ def get_usage_summary(granularity: str = "") -> dict:
         api = _api_stats(db, "")
         cc = _cc_stats(db, excluded, granularity)
         ac_buckets = _activation_code_recharged_buckets(db, granularity, rate, excluded)
+        ac_total_rmb = _activation_code_total(db, excluded, rate)
     except Exception as e:
         logger.error(f"[usage-summary] 查询失败: {e}")
         raise
@@ -342,39 +394,50 @@ def get_usage_summary(granularity: str = "") -> dict:
         "total_recharged": round(_quota_to_rmb(api["total_recharged"], rate)),
         "total_consumed": _quota_to_rmb(api["total_consumed"], rate),
     }
-    cc_row = {
-        "type": CLAUDE_CODE,
-        "total_recharged": round(_quota_to_rmb(cc["total_recharged"], rate)),
-        "total_consumed": _quota_to_rmb(cc["total_consumed"], rate),
-    }
-    # by_plan 保留 api 行供展示，但合计只算 claude code（D-035）
-    by_plan = [api_row, cc_row]
+    cc_consumed_rmb = _quota_to_rmb(cc["total_consumed"], rate)
+    # tokens 口径全量（扣邀请返利/排除表后）——用于反算「其他来源」
+    cc_tokens_rmb = round(_quota_to_rmb(cc["total_recharged"], rate))
+    # 其他来源（历史直充/邀请返利/扣减）= tokens 口径 − 激活码核销口径，只给一个总数
+    cc_other_rmb = cc_tokens_rmb - ac_total_rmb
+
+    # by_plan：api 仅展示；claude code 按激活码核销口径；其他来源单列一行（D-036）
+    by_plan = [
+        api_row,
+        {
+            "type": CLAUDE_CODE,
+            "total_recharged": ac_total_rmb,
+            "total_consumed": cc_consumed_rmb,
+        },
+        {
+            "type": OTHER_SOURCE,
+            "total_recharged": cc_other_rmb,
+            "total_consumed": 0.0,
+        },
+    ]
 
     result = {
         "currency": "CNY",
         "summary": {
-            # 合计 = claude code 口径（与下方分桶、页面顶部统计卡一致）；
-            # api 套餐只在 by_plan 里单列展示，不计入合计（原因见模块 docstring）
-            "total_recharged": round(cc_row["total_recharged"]),
-            "total_consumed": round(cc_row["total_consumed"], 2),
+            # 合计 = claude code 真实充值（激活码核销 + 其他来源）= tokens 口径；
+            # 与分桶之和差一个「其他来源」（不分期，量级约 ¥100 以内）
+            "total_recharged": round(ac_total_rmb + cc_other_rmb),
+            "total_consumed": round(cc_consumed_rmb, 2),
         },
         "by_plan": by_plan,
     }
 
-    # 合并分桶：recharged / consumed 只合成 claude code（api 不计入，D-035）
+    # 合并分桶（D-036）：充值只按激活码核销时间 used_at（唯一有确切入账时间的来源）；
+    # 消耗按 token 创建时间（≈ 用户首次激活/注册，实测与注册周仅 10/594 个不同、
+    # 影响 0.95% 消耗额；B 端 logs 已清理，无法回溯真实消耗时间）。
     if granularity in ("month", "week"):
         merged = {}
-        for bk, quota in cc["recharged_buckets"].items():
+        for bk, rmb in ac_buckets.items():
             m = merged.setdefault(bk, {"recharged": 0, "consumed": 0.0})
-            m["recharged"] += round(_quota_to_rmb(quota, rate))
+            m["recharged"] = rmb
+            m["recharged_by_activation_code"] = rmb
         for bk, quota in cc["consumed_buckets"].items():
             m = merged.setdefault(bk, {"recharged": 0, "consumed": 0.0})
             m["consumed"] += _quota_to_rmb(quota, rate)
-
-        # 激活码核销金额：独立数据源/独立分桶依据（used_at），只补字段不参与求和
-        for bk, rmb in ac_buckets.items():
-            m = merged.setdefault(bk, {"recharged": 0, "consumed": 0.0})
-            m["recharged_by_activation_code"] = rmb
 
         key = "by_month" if granularity == "month" else "by_week"
         result[key] = [
