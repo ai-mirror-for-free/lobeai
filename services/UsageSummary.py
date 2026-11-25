@@ -23,6 +23,16 @@ granularity:
   - month   额外返回按自然月分桶（YYYY-MM）
   - week    额外返回按自然周分桶（YYYY-MM-DD）
 
+api 套餐口径（2026-11-25 起，见 decisions.md D-035）：
+  - **只展示，不计入合计**：api 行仍出现在 by_plan（数据源 A 端 oneapi.tokens
+    group='api'，Σ(remain+used) / Σ used），但 summary 与 by_week/by_month 分桶
+    **不含 api**。
+  - 理由：api 套餐 token 全部挂在管理员账号（批量建 key 机制），无法区分
+    「自用测试」与「卖给客户」，且与激活码（claude code 专属）口径无关；
+    计入合计会让「充值 vs 激活码充值」永远差一笔 api 金额。
+  - 恢复方式：把 `_api_stats(...)` 调用改回 `(db, granularity)` 并把 api 加回
+    summary 求和与 merged 合成（git 历史里有两处唯一入口）。
+
 激活码口径（by_week/by_month 每桶的 recharged_by_activation_code）：
   - 数据源：server a oneapi.activation_codes（lobeai 自建表，同库只读直查）
   - 口径：used_at 非空（已核销）的码，按面值 quota 折算人民币，按 used_at
@@ -300,7 +310,8 @@ def get_usage_summary(granularity: str = "") -> dict:
     db = NewApiDatabaseManager()
     db.connect()
     try:
-        api = _api_stats(db, granularity)
+        # api 套餐只用于 by_plan 展示（不需要分桶，传 '' 少查两条 SQL —— A 端是弱机）
+        api = _api_stats(db, "")
         cc = _cc_stats(db, excluded, granularity)
         ac_buckets = _activation_code_recharged_buckets(db, granularity, rate, excluded)
     except Exception as e:
@@ -326,41 +337,39 @@ def get_usage_summary(granularity: str = "") -> dict:
         logger.warning(f"[usage-summary] 剔除邀请假收入失败（忽略）: {e}")
 
     # 取整规则：充值取整到整元后求和；消耗保留 2 位小数
-    by_plan = [
-        {
-            "type": API,
-            "total_recharged": round(_quota_to_rmb(api["total_recharged"], rate)),
-            "total_consumed": _quota_to_rmb(api["total_consumed"], rate),
-        },
-        {
-            "type": CLAUDE_CODE,
-            "total_recharged": round(_quota_to_rmb(cc["total_recharged"], rate)),
-            "total_consumed": _quota_to_rmb(cc["total_consumed"], rate),
-        },
-    ]
+    api_row = {
+        "type": API,
+        "total_recharged": round(_quota_to_rmb(api["total_recharged"], rate)),
+        "total_consumed": _quota_to_rmb(api["total_consumed"], rate),
+    }
+    cc_row = {
+        "type": CLAUDE_CODE,
+        "total_recharged": round(_quota_to_rmb(cc["total_recharged"], rate)),
+        "total_consumed": _quota_to_rmb(cc["total_consumed"], rate),
+    }
+    # by_plan 保留 api 行供展示，但合计只算 claude code（D-035）
+    by_plan = [api_row, cc_row]
 
     result = {
         "currency": "CNY",
         "summary": {
-            # 充值：整元取整后求和；消耗：保留 2 位小数
-            "total_recharged": round(
-                sum(p["total_recharged"] for p in by_plan)
-            ),
-            "total_consumed": round(sum(p["total_consumed"] for p in by_plan), 2),
+            # 合计 = claude code 口径（与下方分桶、页面顶部统计卡一致）；
+            # api 套餐只在 by_plan 里单列展示，不计入合计（原因见模块 docstring）
+            "total_recharged": round(cc_row["total_recharged"]),
+            "total_consumed": round(cc_row["total_consumed"], 2),
         },
         "by_plan": by_plan,
     }
 
-    # 合并各数据源分桶：recharged = api充值 + cc充值；consumed = api消耗 + cc消耗
+    # 合并分桶：recharged / consumed 只合成 claude code（api 不计入，D-035）
     if granularity in ("month", "week"):
         merged = {}
-        for src in (api, cc):
-            for bk, quota in src["recharged_buckets"].items():
-                m = merged.setdefault(bk, {"recharged": 0, "consumed": 0.0})
-                m["recharged"] += round(_quota_to_rmb(quota, rate))
-            for bk, quota in src["consumed_buckets"].items():
-                m = merged.setdefault(bk, {"recharged": 0, "consumed": 0.0})
-                m["consumed"] += _quota_to_rmb(quota, rate)
+        for bk, quota in cc["recharged_buckets"].items():
+            m = merged.setdefault(bk, {"recharged": 0, "consumed": 0.0})
+            m["recharged"] += round(_quota_to_rmb(quota, rate))
+        for bk, quota in cc["consumed_buckets"].items():
+            m = merged.setdefault(bk, {"recharged": 0, "consumed": 0.0})
+            m["consumed"] += _quota_to_rmb(quota, rate)
 
         # 激活码核销金额：独立数据源/独立分桶依据（used_at），只补字段不参与求和
         for bk, rmb in ac_buckets.items():
