@@ -25,8 +25,12 @@ database:
   username: "postgres"
 
 # --- NewAPI 管理端 ---
+# dev（2026-11-21）：指向本机 new-api-dev（127.0.0.1:25142）。
+#   旧值 154.64.231.128:25142 是 A 端公网，A 端已开防火墙，本机直连不通（超时），
+#   导致 lobeai 建号/改额度/充值、ExperienceAPI 全部失败，所以改本地实例。
+#   注意：本地实例是独立库 oneapi_rc45（用户/额度与线上分离，渠道是生产只读副本）。
 newapi:
-  url: "http://154.64.231.128:25142"
+  url: "http://127.0.0.1:25142"
   username: "yang"
 
 # --- server_b 编排器 ---
